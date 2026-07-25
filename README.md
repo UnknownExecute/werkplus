@@ -47,6 +47,7 @@ Voraussetzung: Synology mit **Container Manager** (früher „Docker"-Paket), x8
    ```
 3. **Starten** (per SSH auf der NAS, im Projektordner):
    ```bash
+   mkdir -p data/bugreports    # Synology legt Bind-Mount-Ordner nicht selbst an
    sudo docker compose up -d --build
    ```
    Container Manager zeigt das Projekt danach unter „Projekt" an; Start/Stopp geht
