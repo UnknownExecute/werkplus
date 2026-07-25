@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} {{ beleg.belegnr }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">
+    {{ label }} {{ beleg.belegnr }}
+    <span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span>
+    {% if zahlungsrelevant and zahlstatus %}
+    <span class="badge {{ zahlstatus_badges[zahlstatus] }}">
+      {{ zahlstatus_labels[zahlstatus] }}{% if zahlstatus == 'bezahlt' and beleg.bezahlt_am %} {{ beleg.bezahlt_am | datum }}{% endif %}</span>
+    {% endif %}
+  </h1>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if beleg.status == 'entwurf' %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/status/gedruckt">
+      <button class="btn btn-primary" type="submit">Drucken/Buchen</button>
+    </form>
+    {% endif %}
+    {% if beleg.status == 'gedruckt' %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/status/erledigt">
+      <button class="btn btn-success" type="submit">Erledigt</button>
+    </form>
+    {% endif %}
+    {% if ist_admin and beleg.status in ('entwurf', 'gedruckt') %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/status/storniert">
+      <button class="btn btn-outline-danger" type="submit">Stornieren</button>
+    </form>
+    {% endif %}
+    {% if folgebeleg_moeglich %}
+    <button class="btn btn-secondary" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/folgebeleg-dialog"
+            hx-target="#folgebeleg-dialog" hx-swap="innerHTML">Folgebeleg erzeugen</button>
+    {% endif %}
+    {% if beleg.belegart == 'auftrag' and beleg.status in ('gedruckt', 'erledigt') %}
+    <button class="btn btn-outline-primary" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/abschlag-dialog"
+            hx-target="#abschlag-dialog" hx-swap="innerHTML">Abschlagsrechnung</button>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/schlussrechnung">
+      <button class="btn btn-outline-primary" type="submit">Schlussrechnung</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/duplizieren">
+      <button class="btn btn-outline-secondary" type="submit">Duplizieren</button>
+    </form>
+    {% if zahlbar %}
+    {% if beleg.bezahlt_am %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/offen">
+      <button class="btn btn-outline-secondary" type="submit">Als offen markieren</button>
+    </form>
+    {% else %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/bezahlt">
+      <button class="btn btn-outline-success" type="submit">Als bezahlt markieren</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="/belege/detail/{{ beleg.id }}/pdf" target="_blank">PDF</a>
+    <a class="btn btn-outline-secondary" href="/belege/detail/{{ beleg.id }}/druckvorschau"
+       target="_blank">Druckvorschau</a>
+  </div>
+</div>
+
+{% if fehler %}
+<div class="alert alert-danger">{{ fehler }}</div>
+{% endif %}
+{% if anlage_hinweis %}
+<div class="alert alert-info">
+  Anlage beim Kunden anlegen?
+  <a class="alert-link" href="/anlagen/neu?von_beleg={{ beleg.id }}">Jetzt anlegen</a>
+</div>
+{% endif %}
+{% if not bearbeitbar %}
+<div class="alert alert-info">Beleg ist gebucht und unveränderlich.</div>
+{% endif %}
+
+<form method="post" action="/belege/detail/{{ beleg.id }}/kopf" class="row g-3 mb-4">
+  <div class="col-md-4">
+    <label class="form-label">Adresse</label>
+    <input class="form-control" value="{{ adresse.firma if adresse else '' }}" disabled>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="datum">Datum</label>
+    <input class="form-control" type="date" name="datum" id="datum"
+           value="{{ beleg.datum.isoformat() }}" {% if not bearbeitbar %}disabled{% endif %}>
+  </div>
+  {% if beleg.belegart == 'rechnung' %}
+  <div class="col-md-2">
+    <label class="form-label" for="leistungsdatum_von">Leistungsdatum von</label>
+    <input class="form-control" type="date" name="leistungsdatum_von" id="leistungsdatum_von"
+           value="{{ beleg.leistungsdatum_von.isoformat() if beleg.leistungsdatum_von else '' }}"
+           {% if not bearbeitbar %}disabled{% endif %}>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="leistungsdatum_bis">Leistungsdatum bis</label>
+    <input class="form-control" type="date" name="leistungsdatum_bis" id="leistungsdatum_bis"
+           value="{{ beleg.leistungsdatum_bis.isoformat() if beleg.leistungsdatum_bis else '' }}"
+           {% if not bearbeitbar %}disabled{% endif %}>
+  </div>
+  {% endif %}
+  <div class="col-md-6">
+    <div class="d-flex justify-content-between align-items-center">
+      <label class="form-label" for="kopftext">Kopftext</label>
+      {% if bearbeitbar %}
+      <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+              hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=kopf"
+              hx-target="#tb-kopf" hx-swap="innerHTML">Textbaustein</button>
+      {% endif %}
+    </div>
+    <textarea class="form-control" name="kopftext" id="kopftext" rows="2"
+              {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.kopftext }}</textarea>
+  </div>
+  <div class="col-md-6">
+    <div class="d-flex justify-content-between align-items-center">
+      <label class="form-label" for="fusstext">Fußtext</label>
+      {% if bearbeitbar %}
+      <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+              hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=fuss"
+              hx-target="#tb-fuss" hx-swap="innerHTML">Textbaustein</button>
+      {% endif %}
+    </div>
+    <textarea class="form-control" name="fusstext" id="fusstext" rows="2"
+              {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.fusstext }}</textarea>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-outline-primary" type="submit"
+            {% if not bearbeitbar %}disabled{% endif %}>Kopf speichern</button>
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6"><div id="tb-kopf"></div></div>
+  <div class="col-md-6"><div id="tb-fuss"></div></div>
+</div>
+
+<div id="folgebeleg-dialog"></div>
+<div id="abschlag-dialog"></div>
+
+{% include "partials/positionsgrid.html" %}
+
+<div id="position-detail">
+  {% if bearbeitbar %}
+  <div class="text-muted small mb-3">
+    Wähle eine Position aus dem Grid, um Details und Kalkulation zu bearbeiten.
+  </div>
+  {% endif %}
+</div>
+
+{% if bearbeitbar %}
+<div class="row mt-3 g-2 align-items-start">
+  <div class="col-md-5 position-relative">
+    <input class="form-control" type="search" name="q" placeholder="Artikel suchen (Nr oder Bezeichnung) …"
+           hx-get="/belege/detail/{{ beleg.id }}/artikelsuche"
+           hx-trigger="input changed delay:300ms" hx-target="#artikel-treffer">
+    <div id="artikel-treffer"></div>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="button"
+            hx-post="/belege/detail/{{ beleg.id }}/positionen"
+            hx-target="#positionsbereich" hx-swap="outerHTML">Freie Position</button>
+  </div>
+</div>
+{% endif %}
+<script src="/static/beleg-editor.js" defer></script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Bug-Meldungen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Fehler &amp; Wünsche</h1>
+  <button class="btn btn-primary" type="button"
+          data-bs-toggle="modal" data-bs-target="#bugMelderModal">
+    Neue Meldung
+  </button>
+</div>
+
+<div id="bugreport-tabelle">
+{% if not reports %}
+  <p class="text-body-secondary">Noch keine Meldungen erfasst.</p>
+{% else %}
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead>
+    <tr>
+      <th>Typ</th>
+      <th>Titel</th>
+      <th>Melder</th>
+      <th>Datum</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for report in reports %}
+    <tr>
+      <td>
+        {% if report.typ.value == 'bug' %}
+        <span class="badge text-bg-danger">{{ typ_labels[report.typ] }}</span>
+        {% else %}
+        <span class="badge text-bg-info">{{ typ_labels[report.typ] }}</span>
+        {% endif %}
+      </td>
+      <td>{{ report.titel }}</td>
+      <td>{{ report.melder_name }}</td>
+      <td>{{ report.erstellt_am | datum }}</td>
+      <td>
+        {% if report.gesendet and report.github_url %}
+        <a href="{{ report.github_url }}" target="_blank" rel="noopener">
+          Issue #{{ report.github_issue_nr }}
+        </a>
+        {% else %}
+        <span class="text-body-secondary">offen</span>
+        {% if report.fehler %}
+        <small class="d-block text-warning">{{ report.fehler }}</small>
+        {% endif %}
+        {% endif %}
+      </td>
+      <td class="text-end">
+        {% if not report.gesendet %}
+        <form method="post" action="/bugreport/{{ report.id }}/senden" class="d-inline">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">
+            Erneut an GitHub senden
+          </button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+<div class="card mt-2 abschlag-dialog">
+  <div class="card-body py-2">
+    <h6 class="card-title">Abschlagsrechnung zu Auftrag {{ beleg.belegnr }}</h6>
+    <table class="table table-sm mb-2" style="max-width:28rem">
+      <tbody>
+        <tr><td>Auftrags-Nettosumme</td><td class="text-end">{{ netto | euro }}</td></tr>
+        <tr><td>Bereits abgerechnete Abschläge</td>
+            <td class="text-end">{{ abgerechnet | euro }}</td></tr>
+        <tr class="fw-bold"><td>Noch offen (netto)</td>
+            <td class="text-end">{{ offen | euro }}</td></tr>
+      </tbody>
+    </table>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/abschlagsrechnung"
+          class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-0" for="abschlag-prozent">Prozent %</label>
+        <input class="form-control form-control-sm text-end" type="text"
+               name="prozent" id="abschlag-prozent" style="width:7rem"
+               placeholder="z. B. 20">
+      </div>
+      <div class="col-auto text-muted pb-1">oder</div>
+      <div class="col-auto">
+        <label class="form-label mb-0" for="abschlag-betrag">Betrag netto</label>
+        <input class="form-control form-control-sm text-end" type="text"
+               name="betrag" id="abschlag-betrag" style="width:9rem"
+               placeholder="z. B. 1.000,00">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-primary" type="submit">Abschlagsrechnung erstellen</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="this.closest('.abschlag-dialog').remove()">Abbrechen</button>
+      </div>
+    </form>
+    <div class="form-text">
+      Der Prozentsatz bezieht sich auf die Auftrags-Nettosumme. Wird ein Betrag
+      angegeben, gilt dieser als Netto-Abschlag.
+    </div>
+  </div>
+</div>

@@ -1,0 +1,23 @@
+{% for anlage, adresse, artikel, sn in zeilen %}
+{% if anlage.naechste_wartung and anlage.naechste_wartung < heute %}
+  {% set zeilen_klasse = "table-danger" %}
+{% elif anlage.naechste_wartung and anlage.naechste_wartung <= grenze %}
+  {% set zeilen_klasse = "table-warning" %}
+{% else %}
+  {% set zeilen_klasse = "" %}
+{% endif %}
+<tr class="{{ zeilen_klasse }}">
+  <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
+  <td>{{ artikel.bezeichnung }}</td>
+  <td><a href="/anlagen/{{ anlage.id }}">{{ sn.sn }}</a></td>
+  <td>{{ anlage.standort }}</td>
+  <td>{{ anlage.inbetriebnahme | datum }}</td>
+  <td>{{ anlage.garantieende | datum }}</td>
+  <td>
+    {{ anlage.naechste_wartung | datum }}
+    {% if not anlage.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="7" class="text-muted">Keine Anlagen gefunden.</td></tr>
+{% endfor %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Anmelden{% endblock %}
+{% block content %}
+<div class="card shadow-sm" style="width: min(400px, 92vw);">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center justify-content-center gap-2 mb-4">
+      <span class="wp-brand-mark">W</span>
+      <span class="h4 mb-0 fw-bold">WerkPlus</span>
+    </div>
+    {% if fehler %}<div class="alert alert-danger py-2">{{ fehler }}</div>{% endif %}
+    <form method="post" action="/login">
+      <div class="mb-3">
+        <label class="form-label" for="login">Benutzer</label>
+        <input class="form-control" type="text" id="login" name="login" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="passwort">Passwort</label>
+        <input class="form-control" type="password" id="passwort" name="passwort" required>
+      </div>
+      <button class="btn btn-primary w-100" type="submit">Anmelden</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

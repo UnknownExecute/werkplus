@@ -1,0 +1,16 @@
+{% for adresse in adressen %}
+<tr>
+  <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
+  <td>{{ adresse.ansprechpartner }}</td>
+  <td>{{ adresse.plz }} {{ adresse.ort }}</td>
+  <td>
+    {% if adresse.typ == "kunde" %}<span class="badge text-bg-success">Kunde</span>
+    {% elif adresse.typ == "lieferant" %}<span class="badge text-bg-warning">Lieferant</span>
+    {% else %}<span class="badge text-bg-info">Beide</span>{% endif %}
+  </td>
+  <td>{{ adresse.telefon }}</td>
+  <td>{{ adresse.email }}</td>
+</tr>
+{% else %}
+<tr><td colspan="6" class="text-muted">Keine Adressen gefunden.</td></tr>
+{% endfor %}

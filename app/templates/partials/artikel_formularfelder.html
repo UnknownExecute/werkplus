@@ -1,0 +1,120 @@
+{# Gemeinsame Formularfelder für Artikel (neu + bearbeiten). Erwartet: artikel, ust_saetze #}
+<div class="row g-3">
+  <div class="col-md-3">
+    <label class="form-label" for="artikelnr">Artikelnr *</label>
+    <input class="form-control" type="text" id="artikelnr" name="artikelnr" value="{{ artikel.artikelnr }}" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="bezeichnung">Bezeichnung *</label>
+    <input class="form-control" type="text" id="bezeichnung" name="bezeichnung" value="{{ artikel.bezeichnung }}" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="warengruppe">Warengruppe</label>
+    <input class="form-control" type="text" id="warengruppe" name="warengruppe" value="{{ artikel.warengruppe }}">
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="langtext">Langtext</label>
+    <textarea class="form-control" id="langtext" name="langtext" rows="3">{{ artikel.langtext }}</textarea>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="einheit">Einheit</label>
+    <input class="form-control" type="text" id="einheit" name="einheit" value="{{ artikel.einheit }}">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="ust_satz">USt-Satz</label>
+    <select class="form-select" id="ust_satz" name="ust_satz" data-kalk="ust">
+      {% for satz in ust_saetze %}
+      <option value="{{ satz }}" {% if artikel.ust_satz == satz %}selected{% endif %}>{{ satz }} %</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Kalkulation (wie Kplus): Listenpreis − Rab1 − Rab2 = EK; EK + Aufschlag % = VK.
+     JS in werkplus.js berechnet EK/VK/Brutto live; EK ist gesperrt, VK überschreibbar.
+     Nur mit Preisrecht sichtbar/bearbeitbar; ohne Recht werden die Pflichtwerte als
+     Hidden-Inputs mitgesendet, damit das Speichern für alle funktioniert. #}
+  {% if darf_kalkulation(request) %}
+  <div class="col-12"><hr class="my-1"><strong class="small text-muted">Kalkulation</strong></div>
+  <div class="col-md-3">
+    <label class="form-label" for="listenpreis_netto">Listenpreis netto</label>
+    <input class="form-control" type="text" id="listenpreis_netto" name="listenpreis_netto"
+           data-kalk="listenpreis_netto" inputmode="decimal"
+           value="{{ artikel.listenpreis_netto | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="listenpreis_brutto">Listenpreis brutto</label>
+    <input class="form-control" type="text" id="listenpreis_brutto" name="listenpreis_brutto"
+           data-kalk="listenpreis_brutto" inputmode="decimal"
+           value="{{ artikel.listenpreis_netto | brutto(artikel.ust_satz) | menge }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="rabatt1_prozent">EK-Rabatt 1 %</label>
+    <input class="form-control" type="text" id="rabatt1_prozent" name="rabatt1_prozent"
+           data-kalk="rabatt1" inputmode="decimal"
+           value="{{ artikel.rabatt1_prozent | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="rabatt2_prozent">EK-Rabatt 2 %</label>
+    <input class="form-control" type="text" id="rabatt2_prozent" name="rabatt2_prozent"
+           data-kalk="rabatt2" inputmode="decimal"
+           value="{{ artikel.rabatt2_prozent | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="ek_preis">EK-Preis (berechnet)</label>
+    <input class="form-control bg-light" type="text" id="ek_preis" name="ek_preis" readonly
+           data-kalk="ek" value="{{ artikel.ek_preis | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="aufschlag_prozent">Aufschlag %</label>
+    <input class="form-control" type="text" id="aufschlag_prozent" name="aufschlag_prozent"
+           data-kalk="aufschlag" inputmode="decimal"
+           value="{{ artikel.aufschlag_prozent | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="vk_preis">VK-Preis netto</label>
+    <input class="form-control" type="text" id="vk_preis" name="vk_preis"
+           data-kalk="vk" inputmode="decimal"
+           value="{{ artikel.vk_preis | string | replace('.', ',') }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="vk_preis_brutto">VK-Preis brutto</label>
+    <input class="form-control bg-light" type="text" id="vk_preis_brutto" readonly
+           data-kalk="vk_brutto"
+           value="{{ artikel.vk_preis | brutto(artikel.ust_satz) | menge }}">
+  </div>
+  {% else %}
+  {# Kein Preisrecht: Kalkulationsfelder verborgen, Pflichtwerte als Hidden mitsenden. #}
+  <input type="hidden" name="listenpreis_netto"
+         value="{{ artikel.listenpreis_netto | string | replace('.', ',') }}">
+  <input type="hidden" name="rabatt1_prozent"
+         value="{{ artikel.rabatt1_prozent | string | replace('.', ',') }}">
+  <input type="hidden" name="rabatt2_prozent"
+         value="{{ artikel.rabatt2_prozent | string | replace('.', ',') }}">
+  <input type="hidden" name="aufschlag_prozent"
+         value="{{ artikel.aufschlag_prozent | string | replace('.', ',') }}">
+  <input type="hidden" name="vk_preis"
+         value="{{ artikel.vk_preis | string | replace('.', ',') }}">
+  {% endif %}
+  <div class="col-12">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="seriennummernpflichtig" name="seriennummernpflichtig"
+             value="true" {% if artikel.seriennummernpflichtig %}checked{% endif %}>
+      <label class="form-check-label" for="seriennummernpflichtig">Seriennummernpflichtig</label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="ist_lagerartikel" name="ist_lagerartikel"
+             value="true" {% if artikel.ist_lagerartikel %}checked{% endif %}>
+      <label class="form-check-label" for="ist_lagerartikel">Lagerartikel (sonst Dienstleistung)</label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="ist_set" name="ist_set"
+             value="true" {% if artikel.ist_set %}checked{% endif %}>
+      <label class="form-check-label" for="ist_set">Set / Stückliste (fügt beim Einsetzen seine Komponenten ein)</label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv"
+             value="true" {% if artikel.aktiv %}checked{% endif %}>
+      <label class="form-check-label" for="aktiv">Aktiv</label>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,37 @@
+{% extends "pdf/basis.html" %}
+
+{# Kopftitel: fachlich "Eingangsrechnung"; die interne EK-Belegnummer bleibt. #}
+{% block belegtitel %}Eingangsrechnung {{ beleg.belegnr }}{% endblock %}
+
+{# Eingangsrechnung (Rechnung des Lieferanten zur Ablage): gleicher Positions-
+   und Summenaufbau je Steuersatz wie pdf/rechnung.html. Die `adresse` ist hier
+   der Lieferant als Aussteller-Bezug. Der Belegkopf zeigt weiterhin "EK-Rechnung"
+   {{ beleg.belegnr }} (unsere interne Belegnummer); die Zeile darunter macht die
+   Rechnung fachlich als Eingangsrechnung des Lieferanten kenntlich.
+   Keine "Zahlbar bis"-Zeile — es ist die Rechnung des Lieferanten, nicht unsere. #}
+
+{% block meta_extra %}
+  <br>
+  Eingangsrechnung des Lieferanten {{ adresse.firma }}
+  {% if adresse.uid %} (UID: {{ adresse.uid }}){% endif %}
+  {% if vorgaenger %}
+  <br>
+  Zum Wareneingang {{ vorgaenger.belegnr }} vom {{ vorgaenger.datum|datum }}
+  {% endif %}
+  {% if beleg.leistungsdatum_von and beleg.leistungsdatum_bis
+        and beleg.leistungsdatum_von != beleg.leistungsdatum_bis %}
+  <br>
+  Leistungszeitraum: {{ beleg.leistungsdatum_von|datum }} &ndash; {{ beleg.leistungsdatum_bis|datum }}
+  {% elif beleg.leistungsdatum_von %}
+  <br>
+  Leistungsdatum: {{ beleg.leistungsdatum_von|datum }}
+  {% endif %}
+{% endblock %}
+
+{# Positions- und Summenblock (je Steuersatz) unverändert aus pdf/basis.html. #}
+
+{% block zahlungsinfo %}
+<div class="zahlungsinfo">
+  Eingangsrechnung zur Ablage &middot; Lieferantenkonto: {{ adresse.firma }}
+</div>
+{% endblock %}

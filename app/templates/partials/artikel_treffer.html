@@ -1,0 +1,14 @@
+{% if treffer %}
+<div class="list-group shadow position-absolute w-100" style="z-index: 1000;">
+  {% for artikel in treffer %}
+  <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between"
+          hx-post="/belege/detail/{{ beleg.id }}/positionen"
+          hx-vals='{"artikel_id": {{ artikel.id }}}'
+          hx-target="#positionsbereich" hx-swap="outerHTML"
+          hx-on::after-request="document.getElementById('artikel-treffer').innerHTML = ''">
+    <span>{{ artikel.artikelnr }} — {{ artikel.bezeichnung }}</span>
+    <span class="text-muted">{{ artikel.vk_preis | euro }} € / {{ artikel.einheit }}</span>
+  </button>
+  {% endfor %}
+</div>
+{% endif %}

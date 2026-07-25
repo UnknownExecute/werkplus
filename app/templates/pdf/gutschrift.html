@@ -1,0 +1,19 @@
+{% extends "pdf/rechnung.html" %}
+
+{# Gutschrift: wie Rechnung, aber mit Hinweis auf die referenzierte Rechnung
+   und ohne Zahlungsziel (der Betrag wird gutgeschrieben). #}
+
+{% block meta_extra %}
+  {{ super() }}
+  {% if vorgaenger %}
+  <br>
+  Gutschrift zu Rechnung {{ vorgaenger.belegnr }} vom {{ vorgaenger.datum|datum }}
+  {% endif %}
+{% endblock %}
+
+{% block zahlungsinfo %}
+<div class="zahlungsinfo">
+  Der Betrag wird Ihnen gutgeschrieben bzw. mit offenen Forderungen verrechnet.<br>
+  Unsere Bankverbindung: IBAN {{ firma.iban }}
+</div>
+{% endblock %}

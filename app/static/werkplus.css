@@ -1,0 +1,248 @@
+/* =========================================================================
+   WerkPlus – modernes Design-System (Bootstrap-5-Override + eigenes Layout)
+   ========================================================================= */
+
+:root {
+  --wp-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Markenfarben */
+  --wp-primary: #2563eb;
+  --wp-primary-dark: #1d4ed8;
+  --wp-primary-soft: #eff4ff;
+
+  /* Flächen & Text (Light) */
+  --wp-bg: #f5f7fb;
+  --wp-surface: #ffffff;
+  --wp-surface-2: #f8fafc;
+  --wp-border: #e6eaf1;
+  --wp-text: #1f2733;
+  --wp-text-muted: #6b7688;
+  --wp-sidebar-bg: #0f172a;
+  --wp-sidebar-text: #cbd5e1;
+  --wp-sidebar-muted: #64748b;
+  --wp-sidebar-active: #1e293b;
+
+  --wp-radius: 14px;
+  --wp-radius-sm: 9px;
+  --wp-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 16px rgba(16, 24, 40, .06);
+  --wp-shadow-sm: 0 1px 2px rgba(16, 24, 40, .06);
+}
+
+[data-bs-theme="dark"] {
+  --wp-bg: #0b1120;
+  --wp-surface: #131c2e;
+  --wp-surface-2: #0f1727;
+  --wp-border: #24304a;
+  --wp-text: #e6ebf4;
+  --wp-text-muted: #94a3b8;
+  --wp-primary-soft: #172554;
+  --wp-sidebar-bg: #0a0f1c;
+  --wp-sidebar-active: #172033;
+  --wp-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+  --wp-shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+}
+
+/* Bootstrap-Variablen an das Theme koppeln — bestehende Klassen erben so das Design */
+:root, [data-bs-theme="light"], [data-bs-theme="dark"] {
+  --bs-primary: var(--wp-primary);
+  --bs-primary-rgb: 37, 99, 235;
+  --bs-body-bg: var(--wp-bg);
+  --bs-body-color: var(--wp-text);
+  --bs-border-color: var(--wp-border);
+  --bs-body-font-family: var(--wp-font);
+  --bs-link-color: var(--wp-primary);
+  --bs-link-hover-color: var(--wp-primary-dark);
+  --bs-secondary-color: var(--wp-text-muted);
+}
+
+body {
+  background: var(--wp-bg);
+  color: var(--wp-text);
+  font-family: var(--wp-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------ Shell */
+.wp-shell { display: flex; min-height: 100vh; }
+
+.wp-sidebar {
+  width: 244px;
+  flex: 0 0 244px;
+  background: var(--wp-sidebar-bg);
+  color: var(--wp-sidebar-text);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 14px 12px 24px;
+}
+
+.wp-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 18px;
+  color: #fff; font-weight: 700; font-size: 1.15rem; letter-spacing: .2px;
+}
+.wp-brand-mark {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--wp-primary), #60a5fa);
+  display: grid; place-items: center; font-weight: 800; color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, .45);
+}
+
+.wp-nav { display: flex; flex-direction: column; gap: 2px; }
+.wp-nav-section {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--wp-sidebar-muted); font-weight: 600;
+  padding: 16px 12px 6px;
+}
+.wp-nav-link {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: 10px;
+  color: var(--wp-sidebar-text); text-decoration: none;
+  font-size: .9rem; font-weight: 500;
+  transition: background .12s ease, color .12s ease;
+}
+.wp-nav-link:hover { background: var(--wp-sidebar-active); color: #fff; }
+.wp-nav-link.active { background: var(--wp-primary); color: #fff; box-shadow: 0 6px 16px rgba(37,99,235,.4); }
+.wp-nav-icon { display: inline-flex; }
+.wp-nav-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* -------------------------------------------------------------- Main area */
+.wp-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+.wp-topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 26px;
+  background: color-mix(in srgb, var(--wp-surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--wp-border);
+  position: sticky; top: 0; z-index: 20;
+}
+.wp-topbar-spacer { flex: 1 1 auto; }
+
+.wp-search {
+  position: relative; display: flex; align-items: center;
+  width: min(360px, 42vw);
+}
+.wp-search svg { position: absolute; left: 12px; width: 17px; height: 17px; fill: none; stroke: var(--wp-text-muted); stroke-width: 2; stroke-linecap: round; }
+.wp-search input {
+  width: 100%; border: 1px solid var(--wp-border); background: var(--wp-surface-2);
+  color: var(--wp-text); border-radius: 999px; padding: 8px 14px 8px 36px;
+  font-size: .9rem; outline: none; transition: border-color .12s, box-shadow .12s;
+}
+.wp-search input:focus { border-color: var(--wp-primary); box-shadow: 0 0 0 3px var(--wp-primary-soft); }
+
+.wp-icon-btn, .wp-menu-btn {
+  border: 1px solid var(--wp-border); background: var(--wp-surface);
+  color: var(--wp-text); width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center; cursor: pointer;
+}
+.wp-icon-btn svg, .wp-menu-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.wp-menu-btn { display: none; }
+.wp-icon-btn .wp-icon-moon { display: none; }
+[data-bs-theme="dark"] .wp-icon-btn .wp-icon-sun { display: none; }
+[data-bs-theme="dark"] .wp-icon-btn .wp-icon-moon { display: block; }
+
+.wp-user { display: flex; align-items: center; gap: 9px; }
+.wp-user-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--wp-primary), #60a5fa); color: #fff;
+  display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+}
+.wp-user-name { font-size: .9rem; font-weight: 600; }
+
+.wp-content { padding: 26px; max-width: 1500px; width: 100%; }
+
+/* Ladebalken (HTMX) */
+.wp-progress { height: 2px; background: transparent; overflow: hidden; }
+.htmx-request .wp-progress::after,
+body.htmx-request .wp-progress::after {
+  content: ""; display: block; height: 2px; width: 40%;
+  background: var(--wp-primary);
+  animation: wp-progress 1s ease-in-out infinite;
+}
+@keyframes wp-progress { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+
+/* --------------------------------------------------------------- Login */
+.wp-auth { min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(1200px 600px at 50% -10%, var(--wp-primary-soft), var(--wp-bg)); }
+
+/* ------------------------------------------------ Bootstrap-Komponenten */
+.card {
+  background: var(--wp-surface); border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius); box-shadow: var(--wp-shadow);
+}
+.card-header {
+  background: transparent; border-bottom: 1px solid var(--wp-border);
+  font-weight: 600; padding: 14px 18px;
+}
+.card-body { padding: 18px; }
+
+h1, .h1, h2, .h2, h3, .h3 { font-weight: 700; letter-spacing: -.01em; }
+
+.btn { border-radius: var(--wp-radius-sm); font-weight: 600; padding: .5rem .95rem; }
+.btn-sm { border-radius: 8px; padding: .3rem .6rem; }
+.btn-primary { background: var(--wp-primary); border-color: var(--wp-primary); }
+.btn-primary:hover { background: var(--wp-primary-dark); border-color: var(--wp-primary-dark); }
+.btn-secondary { background: #64748b; border-color: #64748b; }
+
+.form-control, .form-select {
+  border-radius: var(--wp-radius-sm); border-color: var(--wp-border);
+  background: var(--wp-surface); color: var(--wp-text);
+}
+.form-control-sm, .form-select-sm { border-radius: 8px; }
+.form-control:focus, .form-select:focus {
+  border-color: var(--wp-primary); box-shadow: 0 0 0 3px var(--wp-primary-soft);
+}
+.form-control:disabled, .form-control[readonly] { background: var(--wp-surface-2); }
+.form-label { font-weight: 600; font-size: .86rem; color: var(--wp-text-muted); margin-bottom: .3rem; }
+
+.table { --bs-table-bg: transparent; color: var(--wp-text); vertical-align: middle; }
+.table > :not(caption) > * > * { border-bottom-color: var(--wp-border); }
+.table thead th {
+  font-size: .74rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--wp-text-muted); font-weight: 600; border-bottom: 1px solid var(--wp-border);
+}
+.table-hover > tbody > tr:hover > * { background: var(--wp-primary-soft); }
+.table-responsive { border-radius: var(--wp-radius); }
+
+.badge { font-weight: 600; border-radius: 999px; padding: .32em .7em; }
+
+.dropdown-menu {
+  border-radius: var(--wp-radius-sm); border-color: var(--wp-border);
+  box-shadow: var(--wp-shadow); background: var(--wp-surface);
+}
+.alert { border-radius: var(--wp-radius-sm); border: 1px solid var(--wp-border); }
+.nav-tabs { border-bottom-color: var(--wp-border); }
+.nav-tabs .nav-link { color: var(--wp-text-muted); font-weight: 600; border: none; border-bottom: 2px solid transparent; }
+.nav-tabs .nav-link.active { color: var(--wp-primary); background: transparent; border-bottom-color: var(--wp-primary); }
+
+/* ---------------------------------------------------- eigene Utilities */
+table.tabelle-kompakt td, table.tabelle-kompakt th { padding: 0.4rem 0.6rem; }
+.positionsgrid input.form-control-sm { min-width: 4rem; }
+.suchergebnisse { position: absolute; z-index: 1000; max-height: 20rem; overflow-y: auto;
+  background: var(--wp-surface); border: 1px solid var(--wp-border); border-radius: var(--wp-radius-sm);
+  box-shadow: var(--wp-shadow); width: 100%; }
+
+/* Statistik-Kachel (Dashboard/Cockpit) */
+.wp-stat { display: flex; flex-direction: column; gap: 2px; }
+.wp-stat-label { font-size: .78rem; color: var(--wp-text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.wp-stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }
+
+.htmx-indicator { opacity: 0; transition: opacity 150ms ease-in; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+
+/* ------------------------------------------------------------ Responsive */
+@media (max-width: 860px) {
+  .wp-sidebar {
+    position: fixed; left: 0; top: 0; z-index: 1050;
+    transform: translateX(-100%); transition: transform .2s ease;
+    box-shadow: var(--wp-shadow);
+  }
+  .wp-sidebar.open { transform: translateX(0); }
+  .wp-menu-btn { display: grid; }
+  .wp-user-name { display: none; }
+  .wp-content { padding: 18px 14px; }
+}

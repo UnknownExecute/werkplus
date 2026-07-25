@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Neue Adresse{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Neue Adresse</h1>
+{% include "partials/adr_dublettenwarnung.html" %}
+<form method="post" action="/adressen/neu" class="col-lg-9">
+  {% include "partials/adresse_formularfelder.html" %}
+  {% if dubletten %}<input type="hidden" name="trotzdem_speichern" value="true">{% endif %}
+  <div class="mt-3">
+    <button class="btn btn-primary" type="submit">Speichern</button>
+    <a class="btn btn-outline-secondary" href="/adressen">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Dashboard</h1>
+  <span class="text-muted">Willkommen, {{ benutzer.name }}!</span>
+</div>
+
+{% macro offene_beleg_tabelle(zeilen, leer_text) %}
+<table class="table table-hover tabelle-kompakt mb-0">
+  <thead>
+    <tr><th>Belegnr</th><th>Kunde</th><th>Datum</th><th class="text-end">Brutto</th></tr>
+  </thead>
+  <tbody>
+    {% for beleg, adresse in zeilen %}
+    <tr>
+      <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+      <td>{{ adresse.firma }}</td>
+      <td>{{ beleg.datum | datum }}</td>
+      <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-muted">{{ leer_text }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+<div class="row g-4">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Offene Angebote <span class="badge text-bg-secondary">{{ angebote_anzahl }}</span></span>
+        <a href="/belege/angebot">Alle Angebote</a>
+      </div>
+      <div class="card-body p-0">
+        {{ offene_beleg_tabelle(angebote, "Keine offenen Angebote.") }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Unfertige Aufträge <span class="badge text-bg-secondary">{{ auftraege_anzahl }}</span></span>
+        <a href="/belege/auftrag">Alle Aufträge</a>
+      </div>
+      <div class="card-body p-0">
+        {{ offene_beleg_tabelle(auftraege, "Keine unfertigen Aufträge.") }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Offene Posten <span class="badge text-bg-secondary">{{ offene_posten_anzahl }}</span></span>
+        <a href="/belege/rechnung">Alle Rechnungen</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover tabelle-kompakt mb-0">
+          <thead>
+            <tr><th>Belegnr</th><th>Kunde</th><th>Fällig</th><th class="text-end">Brutto</th></tr>
+          </thead>
+          <tbody>
+            {% for beleg, adresse, ueberfaellig, faelligkeit in offene_posten %}
+            <tr {% if ueberfaellig %}class="table-danger"{% endif %}>
+              <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+              <td>{{ adresse.firma }}</td>
+              <td>
+                {{ faelligkeit | datum }}
+                {% if ueberfaellig %}
+                <span class="badge text-bg-danger">überfällig</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted">Keine offenen Posten.</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if offene_posten %}
+          <tfoot>
+            <tr class="fw-bold">
+              <td colspan="3">Offen gesamt</td>
+              <td class="text-end">{{ offen_gesamt | euro }}</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Fällige Wartungen <span class="badge text-bg-secondary">{{ wartungen | length }}</span></span>
+        <a href="/anlagen?wartung=faellig">Alle fälligen Wartungen</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover tabelle-kompakt mb-0">
+          <thead>
+            <tr><th>Kunde</th><th>Artikel</th><th>Nächste Wartung</th></tr>
+          </thead>
+          <tbody>
+            {% for anlage, adresse, anlage_artikel in wartungen %}
+            <tr {% if anlage.naechste_wartung < heute %}class="table-danger"{% endif %}>
+              <td><a href="/anlagen/{{ anlage.id }}">{{ adresse.firma }}</a></td>
+              <td>{{ anlage_artikel.bezeichnung }}</td>
+              <td>
+                {{ anlage.naechste_wartung | datum }}
+                {% if anlage.naechste_wartung < heute %}
+                <span class="badge text-bg-danger">überfällig</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted">Keine fälligen Wartungen.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Letzte Belege</div>
+      <div class="card-body p-0">
+        <table class="table table-hover tabelle-kompakt mb-0">
+          <thead>
+            <tr><th>Belegnr</th><th>Art</th><th>Firma</th><th>Datum</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for beleg, adresse in letzte_belege %}
+            <tr>
+              <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+              <td>{{ belegart_labels[beleg.belegart] }}</td>
+              <td>{{ adresse.firma }}</td>
+              <td>{{ beleg.datum | datum }}</td>
+              <td><span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Noch keine Belege vorhanden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

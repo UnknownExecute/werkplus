@@ -1,0 +1,6 @@
+{# HTMX-Antwort nach Serviceeinsatz-Erfassung: Historie (Haupt-Swap auf #servicehistorie)
+   plus Out-of-Band-Update des Wartungsfelds im Stammdatenformular. Erwartet: anlage, einsaetze. #}
+{% include "partials/serviceeinsaetze.html" %}
+<input class="form-control" type="date" name="naechste_wartung"
+       id="stamm-naechste-wartung" value="{{ anlage.naechste_wartung or '' }}"
+       hx-swap-oob="true">

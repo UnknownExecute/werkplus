@@ -1,0 +1,66 @@
+<div class="modal fade" id="bugMelderModal" tabindex="-1" aria-hidden="true"
+     aria-labelledby="bugMelderModalLabel">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bugMelderModalLabel">Fehler oder Wunsch melden</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                aria-label="Schließen"></button>
+      </div>
+      <form hx-post="/bugreport" hx-target="#bugMelderErgebnis" hx-swap="innerHTML"
+            hx-encoding="multipart/form-data">
+        <div class="modal-body">
+          <div id="bugMelderErgebnis"></div>
+
+          <div class="mb-3">
+            <div class="btn-group w-100" role="group" aria-label="Art der Meldung">
+              <input type="radio" class="btn-check" name="typ" id="bugTypBug"
+                     value="bug" checked>
+              <label class="btn btn-outline-danger" for="bugTypBug">Fehler</label>
+              <input type="radio" class="btn-check" name="typ" id="bugTypFeature"
+                     value="feature">
+              <label class="btn btn-outline-info" for="bugTypFeature">Wunsch</label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="bugTitel">Titel *</label>
+            <input class="form-control" type="text" id="bugTitel" name="titel"
+                   maxlength="200" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="bugBeschreibung">Beschreibung</label>
+            <textarea class="form-control" id="bugBeschreibung" name="beschreibung"
+                      rows="4" placeholder="Was ist passiert? Was wird erwartet?"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="bugScreenshot">Screenshot (optional)</label>
+            <input class="form-control" type="file" id="bugScreenshot"
+                   name="screenshot" accept="image/*">
+          </div>
+
+          <input type="hidden" name="seite" id="bugSeite" value="">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-dismiss="modal">Schließen</button>
+          <button type="submit" class="btn btn-primary">Absenden</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Aktuelle Seite ins versteckte Feld schreiben, sobald das Modal geöffnet wird.
+  (function () {
+    var modal = document.getElementById("bugMelderModal");
+    if (!modal) return;
+    modal.addEventListener("show.bs.modal", function () {
+      var feld = document.getElementById("bugSeite");
+      if (feld) feld.value = window.location.pathname + window.location.search;
+    });
+  })();
+</script>

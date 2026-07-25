@@ -1,0 +1,70 @@
+{# Gemeinsame Formularfelder für Adresse (neu + bearbeiten). Erwartet: adresse #}
+<div class="row g-3">
+  <div class="col-md-3">
+    <label class="form-label" for="typ">Typ</label>
+    <select class="form-select" id="typ" name="typ">
+      <option value="kunde" {% if adresse.typ == "kunde" %}selected{% endif %}>Kunde</option>
+      <option value="lieferant" {% if adresse.typ == "lieferant" %}selected{% endif %}>Lieferant</option>
+      <option value="beide" {% if adresse.typ == "beide" %}selected{% endif %}>Beide</option>
+    </select>
+  </div>
+  <div class="col-md-5">
+    <label class="form-label" for="firma">Firma *</label>
+    <input class="form-control" type="text" id="firma" name="firma" value="{{ adresse.firma }}" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="ansprechpartner">Ansprechpartner</label>
+    <input class="form-control" type="text" id="ansprechpartner" name="ansprechpartner" value="{{ adresse.ansprechpartner }}">
+  </div>
+  <div class="col-md-5">
+    <label class="form-label" for="strasse">Straße</label>
+    <input class="form-control" type="text" id="strasse" name="strasse" value="{{ adresse.strasse }}">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="plz">PLZ</label>
+    <input class="form-control" type="text" id="plz" name="plz" value="{{ adresse.plz }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="ort">Ort</label>
+    <input class="form-control" type="text" id="ort" name="ort" value="{{ adresse.ort }}">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="land">Land</label>
+    <input class="form-control" type="text" id="land" name="land" value="{{ adresse.land }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="uid">UID</label>
+    <input class="form-control" type="text" id="uid" name="uid" value="{{ adresse.uid }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="email">E-Mail</label>
+    <input class="form-control" type="email" id="email" name="email" value="{{ adresse.email }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="telefon">Telefon</label>
+    <input class="form-control" type="text" id="telefon" name="telefon" value="{{ adresse.telefon }}">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="zahlungsziel_tage">Zahlungsziel (Tage)</label>
+    <input class="form-control" type="number" id="zahlungsziel_tage" name="zahlungsziel_tage" value="{{ adresse.zahlungsziel_tage }}" min="0">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="standard_rabatt_prozent">Standard-Rabatt %</label>
+    <input class="form-control" type="text" id="standard_rabatt_prozent" name="standard_rabatt_prozent" value="{{ adresse.standard_rabatt_prozent | menge }}" inputmode="decimal">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="rabattgruppe">Rabattgruppe</label>
+    <input class="form-control" type="text" id="rabattgruppe" name="rabattgruppe" value="{{ adresse.rabattgruppe }}">
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="notizen">Notizen</label>
+    <textarea class="form-control" id="notizen" name="notizen" rows="3">{{ adresse.notizen }}</textarea>
+  </div>
+  <div class="col-12">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv" value="true"
+             {% if adresse.aktiv %}checked{% endif %}>
+      <label class="form-check-label" for="aktiv">Aktiv</label>
+    </div>
+  </div>
+</div>

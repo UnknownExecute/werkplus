@@ -1,0 +1,31 @@
+{% extends "pdf/basis.html" %}
+
+{# Rechnung mit den Pflichtmerkmalen nach § 11 UStG:
+   Aussteller + Empfänger (Name/Anschrift, UIDs) und die Positionstabelle
+   (Menge + Bezeichnung), Entgelt/Steuersatz/Steuerbetrag je Steuersatz sowie
+   der Bruttobetrag kommen aus pdf/basis.html. Hier ergänzt: Leistungsdatum
+   bzw. -zeitraum, Zahlungsziel und IBAN. #}
+
+{% block belegtitel %}
+  {% if beleg.ist_abschlag %}Abschlagsrechnung{% else %}Rechnung{% endif %} {{ beleg.belegnr }}
+{% endblock %}
+
+{% block meta_extra %}
+  <br>
+  {% if beleg.ist_abschlag %}<strong>Abschlagsrechnung (Anzahlung)</strong><br>{% endif %}
+  {% if beleg.leistungsdatum_von and beleg.leistungsdatum_bis
+        and beleg.leistungsdatum_von != beleg.leistungsdatum_bis %}
+    Leistungszeitraum: {{ beleg.leistungsdatum_von|datum }} &ndash; {{ beleg.leistungsdatum_bis|datum }}
+  {% elif beleg.leistungsdatum_von %}
+    Leistungsdatum: {{ beleg.leistungsdatum_von|datum }}
+  {% else %}
+    Leistungsdatum entspricht Rechnungsdatum
+  {% endif %}
+{% endblock %}
+
+{% block zahlungsinfo %}
+<div class="zahlungsinfo">
+  Zahlbar bis {{ faelligkeit|datum }} ohne Abzug.<br>
+  Bitte überweisen Sie den Betrag auf unser Konto: IBAN {{ firma.iban }}
+</div>
+{% endblock %}

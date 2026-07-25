@@ -1,0 +1,125 @@
+<div id="position-detail"{% if oob %} hx-swap-oob="true"{% endif %}>
+{% if position %}
+{% set hx %}{% if bearbeitbar %}hx-post="/belege/detail/{{ beleg.id }}/positionen/{{ position.id }}" hx-trigger="change" hx-include="closest form" hx-target="#positionsbereich" hx-swap="outerHTML"{% endif %}{% endset %}
+<form class="card mb-3" data-pos-detail onsubmit="return false">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-medium">
+      Position {{ position.pos_nr }}{% if position.bezeichnung %} &middot; {{ position.bezeichnung }}{% endif %}
+    </span>
+    {% if not bearbeitbar %}
+    <span class="badge bg-secondary">gebucht &ndash; nur Ansicht</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-9">
+        <label class="form-label small mb-1" for="pd-bez-{{ position.id }}">Bezeichnung</label>
+        <input class="form-control form-control-sm" id="pd-bez-{{ position.id }}" name="bezeichnung"
+               value="{{ position.bezeichnung }}"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        {% if bearbeitbar %}
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                hx-get="/belege/detail/{{ beleg.id }}/positionen/{{ position.id }}/textbausteine"
+                hx-target="#textbaustein-dialog-{{ position.id }}" hx-swap="innerHTML">
+          Textbaustein
+        </button>
+        {% endif %}
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-1" for="pd-lang-{{ position.id }}">Langtext</label>
+        <textarea class="form-control form-control-sm pos-mehrzeilig" id="pd-lang-{{ position.id }}"
+                  name="langtext" rows="2"
+                  {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}
+                  placeholder="Beschreibung (Shift+Enter f&uuml;r neue Zeile)">{{ position.langtext }}</textarea>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="pd-menge-{{ position.id }}">Menge</label>
+        <input class="form-control form-control-sm text-end" id="pd-menge-{{ position.id }}" name="menge"
+               value="{{ position.menge | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="pd-einheit-{{ position.id }}">Einheit</label>
+        <input class="form-control form-control-sm" id="pd-einheit-{{ position.id }}" name="einheit"
+               value="{{ position.einheit }}"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="pd-ust-{{ position.id }}">USt %</label>
+        <select class="form-select form-select-sm text-end" id="pd-ust-{{ position.id }}" name="ust_satz"
+                {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+          {% for satz in ust_saetze %}
+          <option value="{{ satz }}" {% if position.ust_satz == satz %}selected{% endif %}>{{ satz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="pd-rab-{{ position.id }}">Verkaufsrabatt %</label>
+        <input class="form-control form-control-sm text-end" id="pd-rab-{{ position.id }}"
+               name="rabatt_prozent" value="{{ position.rabatt_prozent | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+    </div>
+
+    <hr class="my-3">
+    {% if darf_kalkulation(request) %}
+    <div class="fw-medium small text-muted mb-2">Kalkulation</div>
+    {% endif %}
+    <div class="row g-2">
+      {% if darf_kalkulation(request) %}
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0" for="lp-{{ position.id }}">Listenpreis</label>
+        <input class="form-control form-control-sm text-end" id="lp-{{ position.id }}" name="listenpreis"
+               value="{{ position.listenpreis | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0" for="rab1-{{ position.id }}">Rab 1 %</label>
+        <input class="form-control form-control-sm text-end" id="rab1-{{ position.id }}"
+               name="rabatt1_prozent" value="{{ position.rabatt1_prozent | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0" for="rab2-{{ position.id }}">Rab 2 %</label>
+        <input class="form-control form-control-sm text-end" id="rab2-{{ position.id }}"
+               name="rabatt2_prozent" value="{{ position.rabatt2_prozent | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0">EK-Preis</label>
+        <input class="form-control form-control-sm text-end bg-light" readonly
+               value="{{ position.ek_preis | menge }}">
+      </div>
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0" for="aufschlag-{{ position.id }}">Aufschlag %</label>
+        <input class="form-control form-control-sm text-end" id="aufschlag-{{ position.id }}"
+               name="aufschlag_prozent" value="{{ position.aufschlag_prozent | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+      {% else %}
+      {# Kalkulation verborgen (kein Preisrecht): Werte als Hidden mitsenden, damit
+         das Speichern von Menge/VK die EK-Kalkulation nicht auf 0 zurücksetzt.
+         EK-Preis ist abgeleitet und wird serverseitig neu berechnet. #}
+      <input type="hidden" name="listenpreis" value="{{ position.listenpreis | menge }}">
+      <input type="hidden" name="rabatt1_prozent" value="{{ position.rabatt1_prozent | menge }}">
+      <input type="hidden" name="rabatt2_prozent" value="{{ position.rabatt2_prozent | menge }}">
+      <input type="hidden" name="aufschlag_prozent" value="{{ position.aufschlag_prozent | menge }}">
+      {% endif %}
+      <div class="col-6 col-lg">
+        <label class="form-label small mb-0" for="vk-{{ position.id }}">Einzelpreis (VK)</label>
+        <input class="form-control form-control-sm text-end" id="vk-{{ position.id }}" name="einzelpreis"
+               value="{{ position.einzelpreis | menge }}" inputmode="decimal"
+               {% if not bearbeitbar %}disabled{% else %}{{ hx|safe }}{% endif %}>
+      </div>
+    </div>
+  </div>
+</form>
+<div id="textbaustein-dialog-{{ position.id }}"></div>
+{% else %}
+<div class="text-muted small mb-3">
+  W&auml;hle eine Position aus dem Grid, um Details und Kalkulation zu bearbeiten.
+</div>
+{% endif %}
+</div>

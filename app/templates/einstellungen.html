@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Firmenstammdaten{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-3">Firmenstammdaten</h1>
+    <p class="text-muted">
+      Diese Daten erscheinen als Absender auf allen Beleg-PDFs (§ 11 UStG).
+    </p>
+
+    {% if gespeichert %}
+    <div class="alert alert-success" role="alert">
+      Firmenstammdaten gespeichert.
+    </div>
+    {% endif %}
+
+    <form method="post" action="/einstellungen">
+      <div class="mb-3">
+        <label class="form-label" for="name">Firmenname</label>
+        <input class="form-control" id="name" name="name" value="{{ firma.name }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="strasse">Straße</label>
+        <input class="form-control" id="strasse" name="strasse" value="{{ firma.strasse }}">
+      </div>
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label" for="plz">PLZ</label>
+          <input class="form-control" id="plz" name="plz" value="{{ firma.plz }}">
+        </div>
+        <div class="col-md-8 mb-3">
+          <label class="form-label" for="ort">Ort</label>
+          <input class="form-control" id="ort" name="ort" value="{{ firma.ort }}">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="land">Land</label>
+        <input class="form-control" id="land" name="land" value="{{ firma.land }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="uid">UID-Nummer</label>
+        <input class="form-control" id="uid" name="uid" value="{{ firma.uid }}">
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label" for="telefon">Telefon</label>
+          <input class="form-control" id="telefon" name="telefon" value="{{ firma.telefon }}">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label" for="email">E-Mail</label>
+          <input class="form-control" id="email" name="email" value="{{ firma.email }}">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="iban">IBAN</label>
+        <input class="form-control" id="iban" name="iban" value="{{ firma.iban }}">
+      </div>
+      <button class="btn btn-primary" type="submit">Speichern</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

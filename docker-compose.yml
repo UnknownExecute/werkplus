@@ -1,0 +1,20 @@
+services:
+  werkplus:
+    build: .
+    image: werkplus:latest
+    container_name: werkplus
+    restart: unless-stopped
+    ports:
+      # Host-Port 8080 → Container 8000. Auf der Synology erreichst du die App
+      # dann unter http://<NAS-IP>:8080
+      - "8080:8000"
+    volumes:
+      # Persistente SQLite-Datenbank (überlebt Container-Updates)
+      - ./data:/data
+      # Bug-Melder-Screenshots dauerhaft sichern
+      - ./data/bugreports:/werkplus/app/static/bugreports
+    env_file:
+      - .env
+    environment:
+      # WERKPLUS_ENV=production erzwingt einen sicheren Secret-Key (siehe .env)
+      WERKPLUS_ENV: "production"

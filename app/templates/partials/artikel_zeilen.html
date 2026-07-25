@@ -1,0 +1,13 @@
+{% for artikel in artikel_liste %}
+<tr>
+  <td><a href="/artikel/{{ artikel.id }}">{{ artikel.artikelnr }}</a></td>
+  <td>{{ artikel.bezeichnung }}</td>
+  <td>{{ artikel.warengruppe }}</td>
+  <td class="text-end">{{ artikel.vk_preis | euro }}</td>
+  <td class="text-end">
+    {% if artikel.ist_lagerartikel %}{{ bestaende.get(artikel.id, 0) | menge }}{% else %}&mdash;{% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-muted">Keine Artikel gefunden.</td></tr>
+{% endfor %}

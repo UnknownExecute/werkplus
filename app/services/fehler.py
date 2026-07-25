@@ -1,0 +1,29 @@
+"""Domänen-Exceptions des Belegwesens."""
+
+
+class WerkplusFehler(Exception):
+    """Basisklasse aller WerkPlus-Domänenfehler."""
+
+
+class UngueltigerStatusUebergang(WerkplusFehler):
+    """Der gewünschte Statusübergang ist laut Statusmaschine nicht erlaubt."""
+
+
+class BelegGesperrt(WerkplusFehler):
+    """Mutation an einem gedruckten/erledigten/stornierten Beleg."""
+
+
+class UngueltigeBelegart(WerkplusFehler):
+    """Belegart ist für diese Operation nicht zulässig (z. B. keine Folgebelegart)."""
+
+
+class SnPflichtVerletzt(WerkplusFehler):
+    """Anzahl zugewiesener/erfasster Seriennummern passt beim Buchen nicht zur Menge."""
+
+
+class SnNichtVerfuegbar(WerkplusFehler):
+    """Seriennummer nicht auf Lager, bereits vergeben oder doppelt angegeben."""
+
+
+class StornoNichtMoeglich(WerkplusFehler):
+    """Der Storno ist fachlich nicht möglich (z. B. Seriennummern bereits verkauft)."""

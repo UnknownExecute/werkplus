@@ -1,0 +1,375 @@
+"""Seed-Daten: Benutzer, Lager, 5 Kunden, 2 Lieferanten, 20 Artikel (5 SN-pflichtig à 3 SNs).
+
+Aufruf:  python -m uv run python -m scripts.seed
+Der Seed ist idempotent — vorhandene Daten (per Artikelnr./Login/Firma erkannt) werden übersprungen.
+Zusätzlich (M5): Demo-Belegdurchlauf Angebot→Auftrag→Lieferschein→Rechnung über die
+Services (inkl. Lagerbuchung) sowie zwei Demo-Anlagen für das Dashboard.
+"""
+
+from datetime import date, timedelta
+from decimal import Decimal
+
+from sqlmodel import Session, select
+
+from app.database import engine
+from app.models import (
+    Adresse,
+    AdressTyp,
+    Anlage,
+    Artikel,
+    Beleg,
+    Belegart,
+    BelegPosition,
+    BelegStatus,
+    Benutzer,
+    Buchungsart,
+    Lager,
+    Lagerbestand,
+    Lagerbewegung,
+    Rolle,
+    Seriennummer,
+    SnStatus,
+)
+from app.services import beleg_service, berechnung, seriennummer_service
+from app.services.auth_service import hash_passwort
+from app.services.buchung import registriere_lager_hooks
+
+BENUTZER = [
+    ("admin", "Administrator", "admin", Rolle.ADMIN),
+    ("sb", "Susi Bearbeiter", "sb", Rolle.SACHBEARBEITER),
+]
+
+KUNDEN = [
+    ("Hotel Alpenblick GmbH", "Fr. Maier", "Dorfstraße 1", "6020", "Innsbruck", "ATU61234567"),
+    ("Bäckerei Brotherz e.U.", "Hr. Weber", "Hauptplatz 4", "4020", "Linz", "ATU62234567"),
+    ("Wohnbau Steiner GmbH", "Hr. Steiner", "Bauring 12", "8010", "Graz", "ATU63234567"),
+    ("Gasthof Post KG", "Fr. Huber", "Poststraße 9", "5020", "Salzburg", "ATU64234567"),
+    ("Privat Fam. Gruber", "Hr. Gruber", "Feldweg 3", "3100", "St. Pölten", ""),
+]
+
+LIEFERANTEN = [
+    ("Vaillant Austria GmbH", "Vertrieb", "Forchheimergasse 7", "1230", "Wien", "ATU65234567"),
+    ("Groß-Elektro Handel AG", "Hr. Ohm", "Industriestraße 20", "4600", "Wels", "ATU66234567"),
+]
+
+# (artikelnr, bezeichnung, warengruppe, einheit, ek, vk, ust, sn_pflicht, lagerartikel)
+ARTIKEL = [
+    ("HZ-1001", "Gastherme ecoTEC plus VC 20", "Heizung", "Stk", "1450.00", "2190.00", 20, True,
+     True),
+    ("HZ-1002", "Wärmepumpe aroTHERM 8kW", "Heizung", "Stk", "5200.00", "7990.00", 20, True, True),
+    ("HZ-1003", "Warmwasserspeicher 200l", "Heizung", "Stk", "620.00", "990.00", 20, True, True),
+    ("KT-2001", "Klimagerät Split 3,5kW", "Kälte", "Stk", "780.00", "1290.00", 20, True, True),
+    ("EL-3001", "Stromzähler smart 3-phasig", "Elektro", "Stk", "145.00", "249.00", 20, True, True),
+    ("HZ-1101", "Heizkörper Typ 22 600x1000", "Heizung", "Stk", "95.00", "168.00", 20, False, True),
+    ("HZ-1102", "Thermostatventil 1/2\"", "Heizung", "Stk", "12.50", "24.90", 20, False, True),
+    ("HZ-1103", "Umwälzpumpe 25-60", "Heizung", "Stk", "142.00", "235.00", 20, False, True),
+    ("HZ-1104", "Ausdehnungsgefäß 18l", "Heizung", "Stk", "28.00", "52.00", 20, False, True),
+    ("HZ-1105", "Sicherheitsventil 3 bar", "Heizung", "Stk", "9.80", "19.90", 20, False, True),
+    ("RO-4001", "Kupferrohr 22mm", "Installation", "m", "6.20", "11.50", 20, False, True),
+    ("RO-4002", "Pressfitting Bogen 22mm", "Installation", "Stk", "2.10", "4.20", 20, False, True),
+    ("RO-4003", "Isolierung 22mm", "Installation", "m", "1.40", "2.90", 20, False, True),
+    ("EL-3101", "Kabel YM-J 5x2,5", "Elektro", "m", "1.85", "3.40", 20, False, True),
+    ("EL-3102", "FI-Schalter 40A", "Elektro", "Stk", "38.00", "69.00", 20, False, True),
+    ("DL-9001", "Montagestunde Geselle", "Dienstleistung", "h", "0.00", "78.00", 20, False, False),
+    ("DL-9002", "Montagestunde Meister", "Dienstleistung", "h", "0.00", "95.00", 20, False, False),
+    ("DL-9003", "Wartungspauschale Therme", "Dienstleistung", "pausch", "0.00", "189.00", 20,
+     False, False),
+    ("DL-9004", "Anfahrtspauschale", "Dienstleistung", "pausch", "0.00", "45.00", 20, False, False),
+    ("DL-9005", "Reparatur-Kleinmaterial", "Material", "pausch", "8.00", "19.00", 20, False, True),
+]
+
+
+def seed_benutzer(session: Session) -> None:
+    for login, name, passwort, rolle in BENUTZER:
+        if session.exec(select(Benutzer).where(Benutzer.login == login)).first():
+            continue
+        session.add(
+            Benutzer(login=login, name=name, passwort_hash=hash_passwort(passwort), rolle=rolle)
+        )
+
+
+def seed_lager(session: Session) -> Lager:
+    lager = session.exec(select(Lager).where(Lager.ist_standard == True)).first()  # noqa: E712
+    if lager is None:
+        lager = Lager(name="Hauptlager", ist_standard=True)
+        session.add(lager)
+        session.flush()
+    return lager
+
+
+def seed_adressen(session: Session) -> None:
+    for firma, ap, strasse, plz, ort, uid in KUNDEN:
+        if session.exec(select(Adresse).where(Adresse.firma == firma)).first():
+            continue
+        session.add(
+            Adresse(
+                typ=AdressTyp.KUNDE, firma=firma, ansprechpartner=ap,
+                strasse=strasse, plz=plz, ort=ort, uid=uid, zahlungsziel_tage=14,
+            )
+        )
+    for firma, ap, strasse, plz, ort, uid in LIEFERANTEN:
+        if session.exec(select(Adresse).where(Adresse.firma == firma)).first():
+            continue
+        session.add(
+            Adresse(
+                typ=AdressTyp.LIEFERANT, firma=firma, ansprechpartner=ap,
+                strasse=strasse, plz=plz, ort=ort, uid=uid, zahlungsziel_tage=30,
+            )
+        )
+
+
+def _kalkulation(ek: Decimal, vk: Decimal) -> dict:
+    """Leitet eine konsistente Kalkulationskette aus EK/VK ab (Demo: 30 % EK-Rabatt).
+
+    Listenpreis wird so gewählt, dass mit 30 % Einkaufsrabatt der EK herauskommt;
+    der Aufschlag wird aus dem gewünschten VK rückgerechnet. VK bleibt der Fixwert.
+    """
+    if ek > 0:
+        rabatt1 = Decimal("30")
+        listenpreis = berechnung.runde(ek / Decimal("0.7"))
+        ek_kalk = berechnung.kalkuliere_ek(listenpreis, rabatt1, Decimal("0"))
+        aufschlag = berechnung.aufschlag_aus_vk(ek_kalk, vk)
+    else:
+        rabatt1 = Decimal("0")
+        listenpreis = Decimal("0")
+        ek_kalk = Decimal("0")
+        aufschlag = Decimal("0")
+    return {
+        "listenpreis_netto": listenpreis,
+        "rabatt1_prozent": rabatt1,
+        "rabatt2_prozent": Decimal("0"),
+        "ek_preis": ek_kalk,
+        "aufschlag_prozent": aufschlag,
+        "vk_preis": vk,
+    }
+
+
+def seed_artikel(session: Session, lager: Lager) -> None:
+    for nr, bez, wg, einheit, ek, vk, ust, sn_pflicht, ist_lager in ARTIKEL:
+        if session.exec(select(Artikel).where(Artikel.artikelnr == nr)).first():
+            continue
+        artikel = Artikel(
+            artikelnr=nr, bezeichnung=bez, warengruppe=wg, einheit=einheit,
+            ust_satz=ust, seriennummernpflichtig=sn_pflicht, ist_lagerartikel=ist_lager,
+            **_kalkulation(Decimal(ek), Decimal(vk)),
+        )
+        session.add(artikel)
+        session.flush()
+
+        if not ist_lager:
+            continue
+
+        startmenge = Decimal("3") if sn_pflicht else Decimal("25")
+        session.add(
+            Lagerbestand(artikel_id=artikel.id, lager_id=lager.id, menge=startmenge)
+        )
+        session.add(
+            Lagerbewegung(
+                artikel_id=artikel.id, lager_id=lager.id, menge=startmenge,
+                buchungsart=Buchungsart.KORREKTUR,
+            )
+        )
+        if sn_pflicht:
+            for i in range(1, 4):
+                session.add(
+                    Seriennummer(
+                        artikel_id=artikel.id,
+                        sn=f"{nr}-SN{i:04d}",
+                        status=SnStatus.AUF_LAGER,
+                        lager_id=lager.id,
+                    )
+                )
+
+
+# (firma, artikelnr, sn, tage relativ zu heute, standort) — Kunden 2 und 4
+DEMO_ANLAGEN = [
+    ("Bäckerei Brotherz e.U.", "HZ-1002", "HZ-1002-DEMO01", 14, "Heizraum Keller"),
+    ("Gasthof Post KG", "KT-2001", "KT-2001-DEMO01", -10, "Gastraum EG"),
+]
+
+
+def _hole_kunde(session: Session, firma: str) -> Adresse:
+    return session.exec(select(Adresse).where(Adresse.firma == firma)).one()
+
+
+def _hole_artikel(session: Session, artikelnr: str) -> Artikel:
+    return session.exec(select(Artikel).where(Artikel.artikelnr == artikelnr)).one()
+
+
+def _seed_demo_anlagen(session: Session) -> None:
+    """Zwei Demo-Anlagen direkt über die Models: eine fällig in 14 Tagen, eine überfällig."""
+    for firma, artikelnr, sn_text, tage, standort in DEMO_ANLAGEN:
+        kunde = _hole_kunde(session, firma)
+        artikel = _hole_artikel(session, artikelnr)
+        sn = Seriennummer(
+            artikel_id=artikel.id, sn=sn_text, status=SnStatus.BEIM_KUNDEN_VERBAUT
+        )
+        session.add(sn)
+        session.flush()
+        session.add(
+            Anlage(
+                adresse_id=kunde.id,
+                artikel_id=artikel.id,
+                seriennummer_id=sn.id,
+                standort=standort,
+                inbetriebnahme=date.today() - timedelta(days=365),
+                naechste_wartung=date.today() + timedelta(days=tage),
+                aktiv=True,
+            )
+        )
+    session.flush()
+
+
+def seed_demo_durchlauf(session: Session) -> None:
+    """Demo-Belegkette Angebot→Auftrag→Lieferschein→Rechnung über die Services.
+
+    Idempotent: existiert bereits ein Angebot, wird nichts angelegt.
+    Der Lieferschein bucht Lager (Hooks!) und verkauft die erste HZ-1001-Seriennummer.
+    """
+    if session.exec(select(Beleg).where(Beleg.belegart == Belegart.ANGEBOT)).first():
+        return
+    registriere_lager_hooks()
+
+    kunde = _hole_kunde(session, "Hotel Alpenblick GmbH")
+    therme = _hole_artikel(session, "HZ-1001")
+    ventil = _hole_artikel(session, "HZ-1102")
+    stunde = _hole_artikel(session, "DL-9001")
+
+    angebot = beleg_service.erstelle_beleg(session, Belegart.ANGEBOT, kunde)
+    beleg_service.fuege_position_hinzu(session, angebot, therme, menge=Decimal("1"))
+    beleg_service.fuege_position_hinzu(session, angebot, ventil, menge=Decimal("8"))
+    beleg_service.fuege_position_hinzu(session, angebot, stunde, menge=Decimal("6"))
+    beleg_service.setze_status(session, angebot, BelegStatus.GEDRUCKT)
+
+    auftrag = beleg_service.erzeuge_folgebeleg(session, angebot)
+    beleg_service.setze_status(session, auftrag, BelegStatus.GEDRUCKT)
+
+    lieferschein = beleg_service.erzeuge_folgebeleg(session, auftrag)
+    ls_position = session.exec(
+        select(BelegPosition).where(
+            BelegPosition.beleg_id == lieferschein.id,
+            BelegPosition.artikel_id == therme.id,
+        )
+    ).one()
+    sns = seriennummer_service.verfuegbare_sns(session, therme.id)
+    seriennummer_service.weise_sns_zu(session, ls_position, [sns[0].id])
+    beleg_service.setze_status(session, lieferschein, BelegStatus.GEDRUCKT)  # bucht Lager
+
+    rechnung = beleg_service.erzeuge_folgebeleg(session, lieferschein)
+    beleg_service.setze_status(session, rechnung, BelegStatus.GEDRUCKT)
+
+    _seed_demo_anlagen(session)
+
+
+# (kuerzel, titel, text, kategorie)
+TEXTBAUSTEINE = [
+    ("gew", "Gewährleistung", "Auf die erbrachte Leistung gewähren wir 2 Jahre "
+     "Gewährleistung gemäß den gesetzlichen Bestimmungen.", "fuss"),
+    ("zahl", "Zahlungsbedingungen", "Zahlbar innerhalb von 14 Tagen ohne Abzug.", "fuss"),
+    ("angb", "Angebotsgültigkeit", "Dieses Angebot ist 30 Tage ab Ausstellungsdatum "
+     "gültig.", "kopf"),
+    ("mont", "Montagehinweis", "Montage inkl. Anschluss an bestehende Installation, "
+     "Inbetriebnahme und Einweisung.", "position"),
+    ("ents", "Altgerät-Entsorgung", "Fachgerechte Demontage und Entsorgung des "
+     "Altgeräts inbegriffen.", "position"),
+]
+
+
+def seed_textbausteine(session: Session) -> None:
+    from app.models import Textbaustein, TextbausteinKategorie
+
+    for kuerzel, titel, text, kategorie in TEXTBAUSTEINE:
+        if session.exec(select(Textbaustein).where(Textbaustein.kuerzel == kuerzel)).first():
+            continue
+        session.add(
+            Textbaustein(
+                kuerzel=kuerzel, titel=titel, text=text,
+                kategorie=TextbausteinKategorie(kategorie),
+            )
+        )
+
+
+def seed_set_artikel(session: Session) -> None:
+    """Demo-Set „Heizungspaket" aus Therme + Speicher + Montage."""
+    from app.models import SetKomponente
+
+    if session.exec(select(Artikel).where(Artikel.artikelnr == "SET-HZ1")).first():
+        return
+    set_artikel = Artikel(
+        artikelnr="SET-HZ1", bezeichnung="Heizungspaket Gastherme komplett",
+        warengruppe="Heizung", einheit="Set", ist_set=True, ist_lagerartikel=False,
+    )
+    session.add(set_artikel)
+    session.flush()
+
+    # (Komponenten-Artikelnr, Menge) — Bestandsartikel aus dem Seed
+    komponenten = [("HZ-1001", "1"), ("HZ-1003", "1"), ("HZ-1103", "1"), ("DL-9001", "6")]
+    for sort, (nr, menge) in enumerate(komponenten):
+        komp = session.exec(select(Artikel).where(Artikel.artikelnr == nr)).first()
+        if komp is not None:
+            session.add(
+                SetKomponente(
+                    set_artikel_id=set_artikel.id, komponente_artikel_id=komp.id,
+                    menge=Decimal(menge), sort=sort,
+                )
+            )
+
+
+def seed_rollen(session: Session) -> None:
+    """Zwei eingebaute Standardrollen (idempotent) — bei create_all statt Migration."""
+    from app.models import Rollenprofil, Zugriff
+
+    vorhanden = {r.name for r in session.exec(select(Rollenprofil)).all()}
+    if "admin" not in vorhanden:
+        session.add(Rollenprofil(
+            name="admin", beschreibung="Vollzugriff", ist_admin=True, ist_standard=True,
+            darf_kalkulation_sehen=True,
+            **{f"recht_{b}": Zugriff.BEARBEITEN for b in
+               ("adressen", "artikel", "verkauf", "einkauf", "lager", "anlagen",
+                "einstellungen", "benutzer")},
+        ))
+    if "sachbearbeiter" not in vorhanden:
+        session.add(Rollenprofil(
+            name="sachbearbeiter", beschreibung="Alles Operative, keine Einstellungen",
+            ist_admin=False, ist_standard=True, darf_kalkulation_sehen=True,
+            recht_adressen=Zugriff.BEARBEITEN, recht_artikel=Zugriff.BEARBEITEN,
+            recht_verkauf=Zugriff.BEARBEITEN, recht_einkauf=Zugriff.BEARBEITEN,
+            recht_lager=Zugriff.BEARBEITEN, recht_anlagen=Zugriff.BEARBEITEN,
+            recht_einstellungen=Zugriff.KEIN, recht_benutzer=Zugriff.KEIN,
+        ))
+    if "monteur" not in vorhanden:
+        # Beispiel für eine eingeschränkte Rolle: nur Service, keine Preise/Marge
+        session.add(Rollenprofil(
+            name="monteur", beschreibung="Monteur: Anlagen & Service, Lager nur ansehen",
+            ist_admin=False, ist_standard=False, darf_kalkulation_sehen=False,
+            recht_adressen=Zugriff.ANSEHEN, recht_artikel=Zugriff.ANSEHEN,
+            recht_verkauf=Zugriff.KEIN, recht_einkauf=Zugriff.KEIN,
+            recht_lager=Zugriff.ANSEHEN, recht_anlagen=Zugriff.BEARBEITEN,
+            recht_einstellungen=Zugriff.KEIN, recht_benutzer=Zugriff.KEIN,
+        ))
+
+
+def run(session: Session) -> None:
+    seed_rollen(session)
+    seed_benutzer(session)
+    lager = seed_lager(session)
+    seed_adressen(session)
+    seed_artikel(session, lager)
+    seed_textbausteine(session)
+    seed_set_artikel(session)
+    session.commit()
+    seed_demo_durchlauf(session)
+    session.commit()
+
+
+def main() -> None:
+    with Session(engine) as session:
+        run(session)
+        anzahl_belege = len(session.exec(select(Beleg)).all())
+        anzahl_anlagen = len(session.exec(select(Anlage)).all())
+    print("Seed abgeschlossen. Logins: admin/admin, sb/sb")
+    print(f"Belege: {anzahl_belege}, Anlagen: {anzahl_anlagen}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,43 @@
+{# Set-Komponenten (Stückliste) eines Set-Artikels. Erwartet: artikel, set_komponenten, verfuegbare_artikel #}
+<div id="set-komponenten">
+  <table class="table tabelle-kompakt">
+    <thead><tr><th>Artikel</th><th class="text-end">Menge</th><th></th></tr></thead>
+    <tbody>
+      {% for komp, komp_artikel in set_komponenten %}
+      <tr>
+        <td>{{ komp_artikel.artikelnr }} – {{ komp_artikel.bezeichnung }}</td>
+        <td class="text-end">{{ komp.menge | menge }}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger" type="button"
+                  hx-post="/artikel/{{ artikel.id }}/set-komponenten/{{ komp.id }}/loeschen"
+                  hx-target="#set-komponenten" hx-swap="outerHTML">Löschen</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="text-muted">Noch keine Komponenten zugeordnet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form class="row g-2 align-items-end"
+        hx-post="/artikel/{{ artikel.id }}/set-komponenten"
+        hx-target="#set-komponenten" hx-swap="outerHTML">
+    <div class="col-md-7">
+      <label class="form-label" for="komponente_artikel_id">Komponente</label>
+      <select class="form-select" id="komponente_artikel_id" name="komponente_artikel_id" required>
+        {% for a in verfuegbare_artikel %}
+        <option value="{{ a.id }}">{{ a.artikelnr }} – {{ a.bezeichnung }}</option>
+        {% else %}
+        <option value="" disabled>Keine Nicht-Set-Artikel vorhanden</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="komp_menge">Menge</label>
+      <input class="form-control" type="text" id="komp_menge" name="menge" value="1" inputmode="decimal">
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100" type="submit">Hinzufügen</button>
+    </div>
+  </form>
+</div>

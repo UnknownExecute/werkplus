@@ -1,0 +1,14 @@
+{# Weiche Dublettenwarnung für das Adressformular. Erwartet: dubletten (Liste Adresse). #}
+{% if dubletten %}
+<div class="alert alert-warning" role="alert">
+  <strong>Achtung:</strong> Firma/UID existiert bereits:
+  <ul class="mb-2 mt-1">
+    {% for d in dubletten %}
+    <li>
+      <a href="/adressen/{{ d.id }}">{{ d.firma }}</a>{% if d.uid %} — UID {{ d.uid }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  Zum Anlegen trotzdem erneut auf <em>Speichern</em> klicken.
+</div>
+{% endif %}

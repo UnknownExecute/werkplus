@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Suche{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Suchergebnisse für „{{ q }}“</h1>
+
+{% set gesamt = adressen | length + artikel | length + belege | length %}
+{% if gesamt == 0 %}
+<div class="alert alert-info">
+  Keine Treffer gefunden. Bitte einen anderen Suchbegriff versuchen (mindestens 2 Zeichen).
+</div>
+{% endif %}
+
+<section class="mb-4">
+  <h2 class="h5">Adressen <span class="badge bg-secondary">{{ adressen | length }}</span></h2>
+  {% if adressen %}
+  <table class="table table-hover tabelle-kompakt">
+    <thead>
+      <tr><th>Firma</th><th>Ansprechpartner</th><th>Ort</th><th>UID</th></tr>
+    </thead>
+    <tbody>
+      {% for adresse in adressen %}
+      <tr>
+        <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
+        <td>{{ adresse.ansprechpartner }}</td>
+        <td>{{ adresse.ort }}</td>
+        <td>{{ adresse.uid }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">Keine Adressen gefunden.</p>
+  {% endif %}
+</section>
+
+<section class="mb-4">
+  <h2 class="h5">Artikel <span class="badge bg-secondary">{{ artikel | length }}</span></h2>
+  {% if artikel %}
+  <table class="table table-hover tabelle-kompakt">
+    <thead>
+      <tr><th>Artikelnr.</th><th>Bezeichnung</th><th>Warengruppe</th></tr>
+    </thead>
+    <tbody>
+      {% for a in artikel %}
+      <tr>
+        <td><a href="/artikel/{{ a.id }}">{{ a.artikelnr }}</a></td>
+        <td>{{ a.bezeichnung }}</td>
+        <td>{{ a.warengruppe }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">Keine Artikel gefunden.</p>
+  {% endif %}
+</section>
+
+<section class="mb-4">
+  <h2 class="h5">Belege <span class="badge bg-secondary">{{ belege | length }}</span></h2>
+  {% if belege %}
+  <table class="table table-hover tabelle-kompakt">
+    <thead>
+      <tr><th>Belegnr.</th><th>Art</th><th>Firma</th><th>Datum</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for beleg, adresse in belege %}
+      <tr>
+        <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+        <td>{{ belegart_labels[beleg.belegart] }}</td>
+        <td>{{ adresse.firma }}</td>
+        <td>{{ beleg.datum | datum }}</td>
+        <td>
+          <span class="badge {{ status_badges[beleg.status] }}">
+            {{ status_labels[beleg.status] }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">Keine Belege gefunden.</p>
+  {% endif %}
+</section>
+{% endblock %}

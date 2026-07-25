@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ adresse.firma }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ adresse.firma }}</h1>
+  <a class="btn btn-outline-secondary" href="/adressen">Zur Liste</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg">
+    <div class="card h-100"><div class="card-body wp-stat">
+      <span class="wp-stat-label">Umsatz netto {{ kennzahlen.jahr }}</span>
+      <span class="wp-stat-value">{{ kennzahlen.jahresumsatz | euro }}</span>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg">
+    <div class="card h-100"><div class="card-body wp-stat">
+      <span class="wp-stat-label">Offene Posten</span>
+      <span class="wp-stat-value">{{ kennzahlen.offene_posten_summe | euro }}</span>
+      <span class="text-muted small">{{ kennzahlen.offene_posten_anzahl }} Rechnung(en)</span>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg">
+    <div class="card h-100"><div class="card-body wp-stat">
+      <span class="wp-stat-label">Anlagen</span>
+      <span class="wp-stat-value">{{ kennzahlen.anlagen_anzahl }}</span>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg">
+    <div class="card h-100"><div class="card-body wp-stat">
+      <span class="wp-stat-label">Letzter Beleg</span>
+      <span class="wp-stat-value">{% if kennzahlen.letzter_beleg_datum %}{{ kennzahlen.letzter_beleg_datum | datum }}{% else %}—{% endif %}</span>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg">
+    <div class="card h-100"><div class="card-body wp-stat">
+      <span class="wp-stat-label">Offene Angebote</span>
+      <span class="wp-stat-value">{{ kennzahlen.offene_angebote_anzahl }}</span>
+    </div></div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-stammdaten" type="button">Stammdaten</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-belege" type="button">Belege</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-anlagen" type="button">Anlagen</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-aktivitaeten" type="button">Aktivitäten</button></li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="tab-stammdaten">
+    {% include "partials/adr_dublettenwarnung.html" %}
+    <form method="post" action="/adressen/{{ adresse.id }}" class="col-lg-9">
+      {% include "partials/adresse_formularfelder.html" %}
+      {% if dubletten %}<input type="hidden" name="trotzdem_speichern" value="true">{% endif %}
+      <div class="mt-3">
+        <button class="btn btn-primary" type="submit">Speichern</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="tab-pane fade" id="tab-belege">
+    <table class="table table-hover tabelle-kompakt">
+      <thead>
+        <tr><th>Belegnr</th><th>Belegart</th><th>Datum</th><th>Status</th><th class="text-end">Summe brutto</th></tr>
+      </thead>
+      <tbody>
+        {% for beleg in belege %}
+        <tr>
+          <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+          <td>{{ belegart_labels[beleg.belegart] }}</td>
+          <td>{{ beleg.datum | datum }}</td>
+          <td><span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span></td>
+          <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-muted">Keine Belege vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane fade" id="tab-anlagen">
+    <table class="table table-hover tabelle-kompakt">
+      <thead>
+        <tr><th>Artikel</th><th>Standort</th><th>Nächste Wartung</th></tr>
+      </thead>
+      <tbody>
+        {% for anlage, anlage_artikel in anlagen %}
+        <tr>
+          <td>{{ anlage_artikel.bezeichnung }}</td>
+          <td>{{ anlage.standort }}</td>
+          <td>{{ anlage.naechste_wartung | datum }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="text-muted">Keine Anlagen vorhanden.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tab-pane fade" id="tab-aktivitaeten">
+    <form class="row g-2 mb-4"
+          hx-post="/adressen/{{ adresse.id }}/aktivitaeten"
+          hx-target="#aktivitaeten-liste" hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <div class="col-md-2">
+        <select class="form-select" name="typ">
+          <option value="notiz">Notiz</option>
+          <option value="telefonat">Telefonat</option>
+          <option value="email">E-Mail</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <input class="form-control" type="text" name="betreff" placeholder="Betreff" required>
+      </div>
+      <div class="col-md-5">
+        <input class="form-control" type="text" name="text" placeholder="Text">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" type="submit">Hinzufügen</button>
+      </div>
+    </form>
+    <div id="aktivitaeten-liste">
+      {% include "partials/aktivitaeten_liste.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

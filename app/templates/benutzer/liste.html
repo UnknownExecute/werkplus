@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Mitarbeiter{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Mitarbeiter</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/benutzer/rollen">Rollen verwalten</a>
+    <a class="btn btn-primary" href="/benutzer/neu">Neuer Mitarbeiter</a>
+  </div>
+</div>
+
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Login</th>
+      <th>Name</th>
+      <th>Rolle</th>
+      <th class="text-center">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in benutzer_liste %}
+    <tr onclick="location.href='/benutzer/{{ b.id }}'" style="cursor:pointer">
+      <td>{{ b.login }}</td>
+      <td>{{ b.name }}</td>
+      <td>{{ b.rolle }}</td>
+      <td class="text-center">
+        {% if b.aktiv %}
+        <span class="badge text-bg-success">aktiv</span>
+        {% else %}
+        <span class="badge text-bg-secondary">inaktiv</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-muted">Noch keine Mitarbeiter angelegt.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

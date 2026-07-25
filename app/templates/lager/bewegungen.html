@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Lagerbewegungen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Lagerbewegungen</h1>
+  <a class="btn btn-primary" href="/lager/korrektur">Bestandskorrektur</a>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-5">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Artikelnr oder Bezeichnung …"
+           hx-get="/lager/bewegungen/suche" hx-trigger="input changed delay:300ms"
+           hx-target="#bewegungen-tabelle" autofocus>
+  </div>
+</div>
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Zeitpunkt</th>
+      <th>Artikel</th>
+      <th>Lager</th>
+      <th class="text-end">Menge</th>
+      <th>Buchungsart</th>
+      <th>Beleg</th>
+      <th>Notiz</th>
+      <th>Benutzer</th>
+    </tr>
+  </thead>
+  <tbody id="bewegungen-tabelle">
+    {% include "partials/bewegung_zeilen.html" %}
+  </tbody>
+</table>
+{% endblock %}

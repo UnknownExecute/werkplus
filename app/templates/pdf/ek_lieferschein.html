@@ -1,0 +1,48 @@
+{% extends "pdf/basis.html" %}
+
+{# Wareneingang (Einkaufs-Lieferschein): analog zu pdf/lieferschein.html.
+   KEINE Preise — nur Pos, Artikelnr, Bezeichnung, Menge, Einheit und die
+   erfassten Seriennummern je Position. Die `adresse` ist hier der Lieferant. #}
+
+{% block meta_extra %}
+  <br>
+  Lieferant: {{ adresse.firma }}
+  {% if vorgaenger %}
+  <br>
+  Zur Bestellung {{ vorgaenger.belegnr }} vom {{ vorgaenger.datum|datum }}
+  {% endif %}
+{% endblock %}
+
+{% block positionen %}
+<table class="positionen">
+  <thead>
+    <tr>
+      <th>Pos</th>
+      <th>Artikelnr</th>
+      <th>Bezeichnung</th>
+      <th class="r">Menge</th>
+      <th>Einheit</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in positionen %}
+    {% set sns = sn_je_position.get(p.id) %}
+    <tr{% if sns %} class="hat-sn"{% endif %}>
+      <td>{{ p.pos_nr }}</td>
+      <td>{{ artikelnr_je_position.get(p.id, "") }}</td>
+      <td>
+        {{ p.bezeichnung }}
+        {% if p.langtext %}<div class="langtext">{{ p.langtext }}</div>{% endif %}
+      </td>
+      <td class="r">{{ p.menge|menge }}</td>
+      <td>{{ p.einheit }}</td>
+    </tr>
+    {% if sns %}
+    <tr class="sn-zeile"><td></td><td></td><td colspan="3">SN: {{ sns|join(", ") }}</td></tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
+{% block summen %}{% endblock %}

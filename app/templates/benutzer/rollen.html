@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Rollen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Rollen</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/benutzer">Mitarbeiter</a>
+    <a class="btn btn-primary" href="/benutzer/rollen/neu">Neue Rolle</a>
+  </div>
+</div>
+
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Beschreibung</th>
+      <th class="text-center">Admin</th>
+      <th class="text-center">Kalkulation</th>
+      <th class="text-center">Standard</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rollen %}
+    <tr onclick="location.href='/benutzer/rollen/{{ r.id }}'" style="cursor:pointer">
+      <td>{{ r.name }}</td>
+      <td class="text-muted">{{ r.beschreibung }}</td>
+      <td class="text-center">
+        {% if r.ist_admin %}<span class="badge text-bg-primary">Admin</span>{% endif %}
+      </td>
+      <td class="text-center">
+        {% if r.darf_kalkulation_sehen %}<span class="badge text-bg-info">sichtbar</span>{% endif %}
+      </td>
+      <td class="text-center">
+        {% if r.ist_standard %}<span class="badge text-bg-secondary">Standard</span>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="text-muted">Noch keine Rollen angelegt.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

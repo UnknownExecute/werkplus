@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{% if neu %}Neuer Mitarbeiter{% else %}{{ benutzer.name }}{% endif %}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">{% if neu %}Neuer Mitarbeiter{% else %}Mitarbeiter bearbeiten{% endif %}</h1>
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
+<form method="post"
+      action="{% if neu %}/benutzer/neu{% else %}/benutzer/{{ benutzer.id }}{% endif %}"
+      class="col-lg-8">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label" for="login">Login</label>
+      <input class="form-control" id="login" name="login" value="{{ benutzer.login }}"
+             {% if neu %}required{% else %}readonly{% endif %}>
+      {% if not neu %}<div class="form-text">Login ist nicht änderbar.</div>{% endif %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="name">Name</label>
+      <input class="form-control" id="name" name="name" value="{{ benutzer.name }}" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="rolle">Rolle</label>
+      <select class="form-select" id="rolle" name="rolle">
+        {% for r in rollen %}
+        <option value="{{ r.name }}"{% if benutzer.rolle == r.name %} selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="passwort">Passwort</label>
+      <input class="form-control" type="password" id="passwort" name="passwort"
+             {% if neu %}required{% endif %}
+             placeholder="{% if not neu %}Nur ausfüllen zum Ändern{% endif %}">
+    </div>
+    {% if not neu %}
+    <div class="col-12">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv" value="true"
+               {% if benutzer.aktiv %}checked{% endif %}{% if ist_selbst %} disabled{% endif %}>
+        <label class="form-check-label" for="aktiv">Aktiv</label>
+        {% if ist_selbst %}
+        <div class="form-text">Sie können sich nicht selbst deaktivieren.</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-primary" type="submit">Speichern</button>
+    <a class="btn btn-outline-secondary" href="/benutzer">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

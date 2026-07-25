@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Artikel{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Artikel</h1>
+  <a class="btn btn-primary" href="/artikel/neu">Neuer Artikel</a>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-5">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Artikelnr, Bezeichnung, Warengruppe …"
+           hx-get="/artikel/suche" hx-trigger="input changed delay:300ms"
+           hx-target="#artikel-tabelle" autofocus>
+  </div>
+</div>
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Artikelnr</th>
+      <th>Bezeichnung</th>
+      <th>Warengruppe</th>
+      <th class="text-end">VK-Preis</th>
+      <th class="text-end">Bestand</th>
+    </tr>
+  </thead>
+  <tbody id="artikel-tabelle">
+    {% include "partials/artikel_zeilen.html" %}
+  </tbody>
+</table>
+{% endblock %}

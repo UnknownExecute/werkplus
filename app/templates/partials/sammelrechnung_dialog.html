@@ -1,0 +1,47 @@
+{# Sammelrechnung: Lieferscheine desselben Kunden auswählen und zu einer
+   Rechnung zusammenfassen. Nur gedruckte/erledigte Lieferscheine sind wählbar. #}
+<form method="post" action="/belege/sammelrechnung" id="sammel-form">
+  <table class="table table-hover tabelle-kompakt align-middle">
+    <thead>
+      <tr>
+        <th style="width:2.5rem" class="text-center">
+          <input class="form-check-input" type="checkbox"
+                 onclick="document.querySelectorAll('#sammel-form .ls-check:not(:disabled)')
+                          .forEach(c => c.checked = this.checked)"
+                 aria-label="Alle auswählen">
+        </th>
+        <th>Belegnr</th>
+        <th>Datum</th>
+        <th>Adresse</th>
+        <th>Status</th>
+        <th class="text-end">Brutto</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for beleg, adresse in belege %}
+      <tr>
+        <td class="text-center">
+          <input class="form-check-input ls-check" type="checkbox"
+                 name="lieferschein_ids" value="{{ beleg.id }}"
+                 {% if beleg.status not in ('gedruckt', 'erledigt') %}disabled
+                 title="Nur gedruckte/erledigte Lieferscheine sind sammelbar"{% endif %}
+                 aria-label="Lieferschein {{ beleg.belegnr }} wählen">
+        </td>
+        <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+        <td>{{ beleg.datum | datum }}</td>
+        <td>{{ adresse.firma }}</td>
+        <td><span class="badge {{ status_badges[beleg.status] }}">
+              {{ status_labels[beleg.status] }}</span></td>
+        <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted">Keine Lieferscheine gefunden.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button class="btn btn-primary" type="submit"
+          {% if not belege %}disabled{% endif %}>Sammelrechnung erstellen</button>
+  <span class="form-text ms-2">
+    Wählt Lieferscheine desselben Kunden aus; sie werden zu einer Rechnung
+    zusammengefasst und auf erledigt gesetzt.</span>
+</form>

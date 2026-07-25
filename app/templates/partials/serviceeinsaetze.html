@@ -1,0 +1,19 @@
+<div id="servicehistorie">
+  <h2 class="h5">Servicehistorie</h2>
+  <table class="table tabelle-kompakt">
+    <thead>
+      <tr><th>Datum</th><th>Beschreibung</th><th>Erfasst von</th></tr>
+    </thead>
+    <tbody>
+      {% for einsatz, einsatz_benutzer in einsaetze %}
+      <tr>
+        <td>{{ einsatz.datum | datum }}</td>
+        <td>{{ einsatz.beschreibung }}</td>
+        <td>{{ einsatz_benutzer.name if einsatz_benutzer else "" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="text-muted">Noch keine Serviceeinsätze erfasst.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

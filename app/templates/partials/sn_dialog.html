@@ -1,0 +1,27 @@
+<div class="card mt-2 sn-dialog">
+  <div class="card-body py-2">
+    <h6 class="card-title">Seriennummern wählen — Pos. {{ position.pos_nr }} {{ position.bezeichnung }}</h6>
+    <form hx-post="/belege/detail/{{ beleg.id }}/positionen/{{ position.id }}/sn-zuweisen"
+          hx-target="#positionsbereich" hx-swap="outerHTML"
+          onchange="this.querySelector('.sn-anzahl').textContent =
+                    this.querySelectorAll('input[name=seriennummer_ids]:checked').length">
+      {% for sn in sns %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="seriennummer_ids"
+               value="{{ sn.id }}" id="sn-check-{{ position.id }}-{{ sn.id }}"
+               {% if sn.id in zugeordnet_ids %}checked{% endif %}>
+        <label class="form-check-label" for="sn-check-{{ position.id }}-{{ sn.id }}">{{ sn.sn }}</label>
+      </div>
+      {% else %}
+      <p class="text-muted mb-1">Keine Seriennummern verfügbar.</p>
+      {% endfor %}
+      <p class="text-muted small my-2">
+        <span class="sn-anzahl">{{ zugeordnet_ids | length }}</span> von {{ sns | length }}
+        gewählt (Menge: {{ position.menge | menge }})
+      </p>
+      <button class="btn btn-sm btn-primary" type="submit">Übernehmen</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              onclick="this.closest('.sn-dialog').remove()">Abbrechen</button>
+    </form>
+  </div>
+</div>

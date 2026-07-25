@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Neuer Beleg – {{ label }}{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Neuer Beleg: {{ label }}</h1>
+<form method="post" action="/belege/{{ belegart }}/neu" class="col-lg-6">
+  <div class="mb-3">
+    <label class="form-label" for="adresse_id">Adresse</label>
+    <select class="form-select" name="adresse_id" id="adresse_id" required>
+      {% for adresse in adressen %}
+      <option value="{{ adresse.id }}">{{ adresse.firma }}{% if adresse.ort %} – {{ adresse.ort }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    {% if not adressen %}
+    <div class="form-text text-danger">Keine passende Adresse vorhanden — bitte zuerst anlegen.</div>
+    {% endif %}
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="datum">Datum</label>
+    <input class="form-control" type="date" name="datum" id="datum" value="{{ heute.isoformat() }}">
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="kopftext">Kopftext</label>
+    <textarea class="form-control" name="kopftext" id="kopftext" rows="3"></textarea>
+  </div>
+  <button class="btn btn-primary" type="submit" {% if not adressen %}disabled{% endif %}>Anlegen</button>
+  <a class="btn btn-outline-secondary" href="/belege/{{ belegart }}">Abbrechen</a>
+</form>
+{% endblock %}

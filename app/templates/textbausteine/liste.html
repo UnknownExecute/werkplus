@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Textbausteine{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Textbausteine</h1>
+  <a class="btn btn-primary" href="/textbausteine/neu">Neuer Textbaustein</a>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-md-5">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Kürzel, Titel, Text …"
+           hx-get="/textbausteine/suche" hx-trigger="input changed delay:300ms"
+           hx-target="#textbaustein-tabelle"
+           hx-include="[name='kategorie']" autofocus>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="kategorie"
+            hx-get="/textbausteine/suche" hx-trigger="change"
+            hx-target="#textbaustein-tabelle"
+            hx-include="[name='q']">
+      <option value="alle"{% if kategorie == 'alle' %} selected{% endif %}>Alle Kategorien</option>
+      <option value="position"{% if kategorie == 'position' %} selected{% endif %}>Position</option>
+      <option value="kopf"{% if kategorie == 'kopf' %} selected{% endif %}>Kopftext</option>
+      <option value="fuss"{% if kategorie == 'fuss' %} selected{% endif %}>Fußtext</option>
+    </select>
+  </div>
+</div>
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Kürzel</th>
+      <th>Titel</th>
+      <th>Kategorie</th>
+      <th>Textvorschau</th>
+      <th class="text-center">Aktiv</th>
+    </tr>
+  </thead>
+  <tbody id="textbaustein-tabelle">
+    {% include "partials/textbaustein_zeilen.html" %}
+  </tbody>
+</table>
+{% endblock %}

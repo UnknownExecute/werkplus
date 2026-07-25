@@ -1,0 +1,16 @@
+<div class="card mt-2 sn-dialog">
+  <div class="card-body py-2">
+    <h6 class="card-title">Seriennummern erfassen — Pos. {{ position.pos_nr }} {{ position.bezeichnung }}</h6>
+    <form hx-post="/belege/detail/{{ beleg.id }}/positionen/{{ position.id }}/sn-erfassen"
+          hx-target="#positionsbereich" hx-swap="outerHTML">
+      {% for wert in werte %}
+      <input class="form-control form-control-sm mb-1" name="sns" value="{{ wert }}"
+             placeholder="Seriennummer {{ loop.index }}">
+      {% endfor %}
+      <p class="text-muted small my-2">Leere Felder werden ignoriert (Menge: {{ position.menge | menge }}).</p>
+      <button class="btn btn-sm btn-primary" type="submit">Übernehmen</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              onclick="this.closest('.sn-dialog').remove()">Abbrechen</button>
+    </form>
+  </div>
+</div>

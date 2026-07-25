@@ -1,0 +1,19 @@
+{% for bewegung, artikel, lager, beleg, benutzer in zeilen %}
+<tr>
+  <td>{{ bewegung.zeitstempel.strftime("%d.%m.%Y %H:%M") }}</td>
+  <td>{{ artikel.artikelnr }} — {{ artikel.bezeichnung }}</td>
+  <td>{{ lager.name }}</td>
+  <td class="text-end {{ 'text-danger' if bewegung.menge < 0 else 'text-success' }}">
+    {{ '+' if bewegung.menge >= 0 else '' }}{{ bewegung.menge | menge }}</td>
+  <td>{{ buchungsart_labels[bewegung.buchungsart] }}</td>
+  <td>
+    {% if beleg %}
+    <a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a>
+    {% else %}—{% endif %}
+  </td>
+  <td>{{ bewegung.notiz or '—' }}</td>
+  <td>{{ benutzer.name if benutzer else '—' }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="text-muted">Keine Bewegungen.</td></tr>
+{% endfor %}

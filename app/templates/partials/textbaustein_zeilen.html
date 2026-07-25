@@ -1,0 +1,13 @@
+{% for baustein in bausteine %}
+<tr>
+  <td><a href="/textbausteine/{{ baustein.id }}">{{ baustein.kuerzel or '—' }}</a></td>
+  <td>{{ baustein.titel }}</td>
+  <td><span class="badge text-bg-secondary">{{ kategorie_labels[baustein.kategorie] }}</span></td>
+  <td class="text-muted">{{ baustein.text[:80] }}{% if baustein.text|length > 80 %}…{% endif %}</td>
+  <td class="text-center">
+    {% if baustein.aktiv %}<span class="badge text-bg-success">aktiv</span>{% else %}<span class="badge text-bg-light text-muted">inaktiv</span>{% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-muted">Keine Textbausteine gefunden.</td></tr>
+{% endfor %}

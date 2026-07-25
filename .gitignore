@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
+.ruff_cache/
+
+# Konfiguration mit Geheimnissen (Secret-Key, GitHub-Token) – NIE committen
+.env
+
+# Laufzeitdaten (Docker-Volume, DB, Bug-Screenshots)
+/data/
+app/static/bugreports/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

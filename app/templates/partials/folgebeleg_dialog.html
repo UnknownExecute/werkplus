@@ -1,0 +1,43 @@
+<div class="card mt-2 folgebeleg-dialog">
+  <div class="card-body py-2">
+    <h6 class="card-title">Folgebeleg erzeugen: {{ ziel_label }}</h6>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/folgebeleg">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2">
+          <thead>
+            <tr>
+              <th style="width:3rem">Pos</th>
+              <th>Bezeichnung</th>
+              <th class="text-end">Ursprungsmenge</th>
+              <th class="text-end">Bereits übernommen</th>
+              <th class="text-end">Restmenge</th>
+              <th class="text-end" style="width:9rem">Übernehmen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pos in positionen %}
+            <tr>
+              <td>{{ pos.pos_nr }}</td>
+              <td>{{ pos.bezeichnung }}</td>
+              <td class="text-end">{{ pos.menge | menge }} {{ pos.einheit }}</td>
+              <td class="text-end">{{ uebernommen[pos.id] | menge }}</td>
+              <td class="text-end">{{ restmengen[pos.id] | menge }}</td>
+              <td class="text-end">
+                <input class="form-control form-control-sm text-end" type="text"
+                       name="menge_{{ pos.id }}" value="{{ restmengen[pos.id] | menge }}"
+                       aria-label="Übernahmemenge Pos. {{ pos.pos_nr }}">
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-muted">Keine offenen Restmengen.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button class="btn btn-sm btn-primary" type="submit"
+              {% if not positionen %}disabled{% endif %}>Folgebeleg erzeugen</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              onclick="this.closest('.folgebeleg-dialog').remove()">Abbrechen</button>
+    </form>
+  </div>
+</div>

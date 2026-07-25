@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Adressen{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Adressen</h1>
+  <a class="btn btn-primary" href="/adressen/neu">Neue Adresse</a>
+</div>
+
+<form class="row g-2 mb-3" onsubmit="return false;">
+  <div class="col-md-5">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Firma, Ansprechpartner, Ort …"
+           hx-get="/adressen/suche" hx-trigger="input changed delay:300ms"
+           hx-target="#adressen-tabelle" hx-include="closest form" autofocus>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="typ"
+            hx-get="/adressen/suche" hx-trigger="change"
+            hx-target="#adressen-tabelle" hx-include="closest form">
+      <option value="alle" {% if typ == "alle" %}selected{% endif %}>Alle Typen</option>
+      <option value="kunde" {% if typ == "kunde" %}selected{% endif %}>Kunde</option>
+      <option value="lieferant" {% if typ == "lieferant" %}selected{% endif %}>Lieferant</option>
+      <option value="beide" {% if typ == "beide" %}selected{% endif %}>Beide</option>
+    </select>
+  </div>
+</form>
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Firma</th>
+      <th>Ansprechpartner</th>
+      <th>Ort</th>
+      <th>Typ</th>
+      <th>Telefon</th>
+      <th>E-Mail</th>
+    </tr>
+  </thead>
+  <tbody id="adressen-tabelle">
+    {% include "partials/adressen_zeilen.html" %}
+  </tbody>
+</table>
+{% endblock %}

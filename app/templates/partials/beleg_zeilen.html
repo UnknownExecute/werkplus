@@ -1,0 +1,20 @@
+{% for beleg, adresse in belege %}
+<tr>
+  <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+  <td>{{ beleg.datum | datum }}</td>
+  <td>{{ adresse.firma }}</td>
+  <td><span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span></td>
+  {% if zahlungsrelevant %}
+  <td>
+    {% set zs = zahlung_map.get(beleg.id) %}
+    {% if zs %}
+    <span class="badge {{ zahlstatus_badges[zs[0]] }}">
+      {{ zahlstatus_labels[zs[0]] }}{% if zs[0] == 'bezahlt' and beleg.bezahlt_am %} {{ beleg.bezahlt_am | datum }}{% endif %}</span>
+    {% endif %}
+  </td>
+  {% endif %}
+  <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+</tr>
+{% else %}
+<tr><td colspan="{{ 6 if zahlungsrelevant else 5 }}" class="text-muted">Keine Belege gefunden.</td></tr>
+{% endfor %}

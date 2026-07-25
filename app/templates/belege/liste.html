@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ label_plural }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ label_plural }}</h1>
+  <a class="btn btn-primary" href="/belege/{{ belegart }}/neu">Neuer Beleg</a>
+</div>
+
+{% if fehler %}
+<div class="alert alert-danger">{{ fehler }}</div>
+{% endif %}
+
+{% if belegart == 'lieferschein' %}
+{# Lieferscheine: Suche als klassisches GET-Formular (Seiten-Reload), damit die
+   Sammelrechnungs-Checkboxen nach dem Filtern erhalten bleiben. #}
+<form method="get" action="/belege/lieferschein" class="row mb-3 g-2">
+  <div class="col-md-4">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Belegnr, Firma …" autofocus>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="status_filter" onchange="this.form.submit()">
+      <option value="alle">Alle Status</option>
+      {% for s, text in status_labels.items() %}
+      <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Suchen</button>
+  </div>
+</form>
+
+{% include "partials/sammelrechnung_dialog.html" %}
+{% else %}
+<div class="row mb-3 g-2">
+  <div class="col-md-4">
+    <input class="form-control" type="search" name="q" value="{{ q }}"
+           placeholder="Suche: Belegnr, Firma …"
+           hx-get="/belege/{{ belegart }}/suche" hx-trigger="input changed delay:300ms"
+           hx-target="#beleg-tabelle" hx-include="#status-filter" autofocus>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="status_filter" id="status-filter"
+            hx-get="/belege/{{ belegart }}/suche" hx-trigger="change"
+            hx-target="#beleg-tabelle" hx-include="[name='q']">
+      <option value="alle">Alle Status</option>
+      {% for s, text in status_labels.items() %}
+      <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+<table class="table table-hover tabelle-kompakt">
+  <thead>
+    <tr>
+      <th>Belegnr</th>
+      <th>Datum</th>
+      <th>Adresse</th>
+      <th>Status</th>
+      {% if zahlungsrelevant %}<th>Zahlung</th>{% endif %}
+      <th class="text-end">Brutto</th>
+    </tr>
+  </thead>
+  <tbody id="beleg-tabelle">
+    {% include "partials/beleg_zeilen.html" %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

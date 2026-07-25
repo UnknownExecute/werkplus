@@ -1,0 +1,41 @@
+[project]
+name = "werkplus"
+version = "0.1.0"
+description = "WerkPlus - CRM + schlankes ERP für Handwerksbetriebe (Kplus-inspiriert)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "jinja2>=3.1",
+    "sqlmodel>=0.0.22",
+    "alembic>=1.14",
+    "python-multipart>=0.0.17",
+    "itsdangerous>=2.2",
+    "argon2-cffi>=23.1",
+    "weasyprint>=63",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI Depends() in Default-Argumenten ist idiomatisch
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/*" = ["E501", "UP", "I001", "F401"]  # generierter Code
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.uv]
+package = false

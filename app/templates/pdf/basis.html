@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>{{ belegart_label }} {{ beleg.belegnr }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2cm;
+    @bottom-center {
+      content: element(fusszeile);
+    }
+    @bottom-right {
+      content: "Seite " counter(page) " / " counter(pages);
+      font-size: 8pt;
+      color: #555;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Helvetica", "Arial", sans-serif;
+    font-size: 10pt;
+    background: #fff;
+    color-scheme: light;
+    color: #1a1a1a;
+    margin: 0;
+  }
+  .briefkopf {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1.2cm;
+  }
+  .empfaenger {
+    /* Fensterbereich links */
+    width: 8.5cm;
+    margin-top: 1.6cm;
+    line-height: 1.4;
+  }
+  .absender {
+    text-align: right;
+    font-size: 9pt;
+    line-height: 1.5;
+    color: #333;
+  }
+  .absender .firmenname {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #1a1a1a;
+  }
+  h1 {
+    font-size: 15pt;
+    margin: 0 0 0.2cm 0;
+  }
+  .belegmeta {
+    margin-bottom: 0.6cm;
+    line-height: 1.5;
+  }
+  .kopftext, .fusstext {
+    white-space: pre-line;
+    margin: 0.4cm 0;
+  }
+  table.positionen {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.4cm 0;
+  }
+  table.positionen th {
+    text-align: left;
+    border-bottom: 1.5pt solid #1a1a1a;
+    padding: 3pt 4pt;
+    font-size: 9pt;
+  }
+  table.positionen td {
+    border-bottom: 0.5pt solid #bbb;
+    padding: 4pt;
+    vertical-align: top;
+  }
+  table.positionen tr.sn-zeile td {
+    border-bottom: 0.5pt solid #bbb;
+    font-size: 8.5pt;
+    color: #444;
+    padding-top: 0;
+  }
+  table.positionen tr.hat-sn td {
+    border-bottom: none;
+  }
+  .langtext {
+    font-size: 8.5pt;
+    color: #444;
+    white-space: pre-line;
+  }
+  th.r, td.r { text-align: right; }
+  table.summen {
+    width: 8cm;
+    margin-left: auto;
+    border-collapse: collapse;
+    margin-top: 0.3cm;
+  }
+  table.summen td {
+    padding: 2pt 4pt;
+  }
+  table.summen td.r { text-align: right; }
+  table.summen tr.gesamt td {
+    border-top: 0.5pt solid #1a1a1a;
+  }
+  table.summen tr.brutto td {
+    border-top: 1.5pt double #1a1a1a;
+    font-weight: bold;
+  }
+  .zahlungsinfo {
+    margin-top: 0.6cm;
+  }
+  footer.fusszeile {
+    position: running(fusszeile);
+    font-size: 8pt;
+    color: #555;
+    text-align: center;
+    border-top: 0.5pt solid #999;
+    padding-top: 4pt;
+  }
+</style>
+</head>
+<body>
+
+<div class="briefkopf">
+  <div class="empfaenger">
+    {{ adresse.firma }}<br>
+    {% if adresse.ansprechpartner %}{{ adresse.ansprechpartner }}<br>{% endif %}
+    {% if adresse.strasse %}{{ adresse.strasse }}<br>{% endif %}
+    {{ adresse.plz }} {{ adresse.ort }}<br>
+    {{ adresse.land }}
+    {% if adresse.uid %}<br>UID: {{ adresse.uid }}{% endif %}
+  </div>
+  <div class="absender">
+    <span class="firmenname">{{ firma.name }}</span><br>
+    {{ firma.strasse }}<br>
+    {{ firma.plz }} {{ firma.ort }}, {{ firma.land }}<br>
+    Tel. {{ firma.telefon }}<br>
+    {{ firma.email }}<br>
+    UID: {{ firma.uid }}
+  </div>
+</div>
+
+<h1>{% block belegtitel %}{{ belegart_label }} {{ beleg.belegnr }}{% endblock %}</h1>
+<div class="belegmeta">
+  Datum: {{ beleg.datum|datum }}
+  {% block meta_extra %}{% endblock %}
+</div>
+
+{% if beleg.kopftext %}<div class="kopftext">{{ beleg.kopftext }}</div>{% endif %}
+
+{% block positionen %}
+<table class="positionen">
+  <thead>
+    <tr>
+      <th>Pos</th>
+      <th>Artikelnr</th>
+      <th>Bezeichnung</th>
+      <th class="r">Menge</th>
+      <th class="r">Einzelpreis &euro;</th>
+      <th class="r">Rabatt %</th>
+      <th class="r">Netto &euro;</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in positionen %}
+    {% set sns = sn_je_position.get(p.id) %}
+    <tr{% if sns %} class="hat-sn"{% endif %}>
+      <td>{{ p.pos_nr }}</td>
+      <td>{{ artikelnr_je_position.get(p.id, "") }}</td>
+      <td>
+        {{ p.bezeichnung }}
+        {% if p.langtext %}<div class="langtext">{{ p.langtext }}</div>{% endif %}
+      </td>
+      <td class="r">{{ p.menge|menge }} {{ p.einheit }}</td>
+      <td class="r">{{ p.einzelpreis|euro }}</td>
+      <td class="r">{% if p.rabatt_prozent %}{{ p.rabatt_prozent|menge }}{% endif %}</td>
+      <td class="r">{{ netto_je_position[p.id]|euro }}</td>
+    </tr>
+    {% if sns %}
+    <tr class="sn-zeile"><td></td><td></td><td colspan="5">SN: {{ sns|join(", ") }}</td></tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+
+{% block summen %}
+<table class="summen">
+  {% for satz, s in summen.je_steuersatz|dictsort %}
+  <tr><td>Nettobetrag {{ satz }} % USt</td><td class="r">{{ s.netto|euro }} &euro;</td></tr>
+  <tr><td>zzgl. {{ satz }} % USt</td><td class="r">{{ s.ust|euro }} &euro;</td></tr>
+  {% endfor %}
+  <tr class="gesamt"><td>Nettobetrag gesamt</td><td class="r">{{ summen.netto|euro }} &euro;</td></tr>
+  <tr><td>USt gesamt</td><td class="r">{{ summen.ust|euro }} &euro;</td></tr>
+  <tr class="brutto"><td>Gesamtbetrag</td><td class="r">{{ summen.brutto|euro }} &euro;</td></tr>
+</table>
+{% endblock %}
+
+{% block zahlungsinfo %}{% endblock %}
+
+{% if beleg.fusstext %}<div class="fusstext">{{ beleg.fusstext }}</div>{% endif %}
+
+<footer class="fusszeile">
+  {{ firma.name }} &middot; UID: {{ firma.uid }} &middot; IBAN: {{ firma.iban }} &middot; Tel. {{ firma.telefon }}
+</footer>
+
+</body>
+</html>

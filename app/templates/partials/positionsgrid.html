@@ -1,0 +1,138 @@
+<div id="positionsbereich">
+  <div class="table-responsive">
+  <table class="table table-hover tabelle-kompakt align-middle">
+    <thead>
+      <tr>
+        <th style="width:3%">Pos</th>
+        <th style="width:9%">Artikelnr</th>
+        <th>Bezeichnung</th>
+        <th class="text-end" style="width:11%">Menge</th>
+        <th class="text-end" style="width:10%">Einzelpreis</th>
+        <th class="text-end" style="width:7%">Rabatt %</th>
+        <th class="text-end" style="width:6%">USt %</th>
+        <th class="text-end" style="width:11%">Netto</th>
+        <th style="width:7%"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pos in positionen %}
+      {% set artikel = artikel_map.get(pos.artikel_id) %}
+      {# Zeile ist anklickbar: lädt das Detail-Panel der Position. Aktionsbuttons
+         stoppen die Weitergabe, damit der Zeilen-Klick nicht mit auslöst. #}
+      <tr data-pos-id="{{ pos.id }}" style="cursor:pointer"
+          class="{% if aktiv_id == pos.id %}table-active{% endif %}"
+          hx-get="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}/detail"
+          hx-target="#position-detail" hx-swap="outerHTML">
+        <td>{{ pos.pos_nr }}</td>
+        <td class="text-nowrap">{{ artikel.artikelnr if artikel else '—' }}</td>
+        <td>
+          <div class="fw-medium">{{ pos.bezeichnung or '—' }}</div>
+          {% if pos.langtext %}
+          <div class="small text-muted text-truncate" style="max-width:34rem">
+            {{ pos.langtext.splitlines()[0] }}</div>
+          {% endif %}
+        </td>
+        <td class="text-end text-nowrap">
+          {{ pos.menge | menge }} {{ pos.einheit }}
+          {% if pos.id in bestand_warnungen %}
+          <span class="badge bg-warning text-dark"
+                title="Bestand reicht nicht — Buchung trotzdem möglich">
+            Bestand: {{ bestand_warnungen[pos.id] | menge }}</span>
+          {% endif %}
+        </td>
+        <td class="text-end">{{ pos.einzelpreis | euro }}</td>
+        <td class="text-end">{{ pos.rabatt_prozent | menge }}</td>
+        <td class="text-end">{{ pos.ust_satz }}</td>
+        <td class="text-end">{{ netto_map[pos.id] | euro }}</td>
+        <td class="text-end text-nowrap">
+          {% if bearbeitbar %}
+          <button class="btn btn-sm btn-outline-secondary px-1 py-0" type="button" title="Nach oben"
+                  data-no-select onclick="event.stopPropagation()"
+                  hx-post="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}/verschieben?richtung=hoch"
+                  hx-target="#positionsbereich" hx-swap="outerHTML"
+                  {% if loop.first %}disabled{% endif %}>&uarr;</button>
+          <button class="btn btn-sm btn-outline-secondary px-1 py-0" type="button" title="Nach unten"
+                  data-no-select onclick="event.stopPropagation()"
+                  hx-post="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}/verschieben?richtung=runter"
+                  hx-target="#positionsbereich" hx-swap="outerHTML"
+                  {% if loop.last %}disabled{% endif %}>&darr;</button>
+          <button class="btn btn-sm btn-outline-danger px-1 py-0" type="button" title="Position löschen"
+                  data-no-select onclick="event.stopPropagation()"
+                  hx-delete="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}"
+                  hx-target="#positionsbereich" hx-swap="outerHTML">&times;</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% if sn_anzeige and artikel and artikel.seriennummernpflichtig %}
+      <tr class="table-light">
+        <td></td>
+        <td colspan="8">
+          <small class="text-muted me-2">Seriennummern:</small>
+          {% for sn in sn_map.get(pos.id, []) %}
+          <span class="badge bg-secondary me-1">{{ sn.sn }}</span>
+          {% else %}
+          <small class="text-muted fst-italic me-2">keine zugeordnet</small>
+          {% endfor %}
+          {% if sn_wahl %}
+          {% if beleg.belegart == 'lieferschein' %}
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  hx-get="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}/sn-dialog"
+                  hx-target="#sn-dialog-{{ pos.id }}" hx-swap="innerHTML">SN wählen</button>
+          {% elif beleg.belegart == 'ek_lieferschein' %}
+          <button class="btn btn-sm btn-outline-secondary" type="button"
+                  hx-get="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}/sn-erfassung"
+                  hx-target="#sn-dialog-{{ pos.id }}" hx-swap="innerHTML">SNs erfassen</button>
+          {% endif %}
+          <div id="sn-dialog-{{ pos.id }}"></div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% else %}
+      <tr><td colspan="9" class="text-muted">Keine Positionen.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div class="row justify-content-end">
+    <div class="col-md-4">
+      <table class="table table-sm">
+        <tbody>
+          {% for satz, s in summen.items() %}
+          <tr>
+            <td>Netto {{ satz }} %</td>
+            <td class="text-end">{{ s.netto | euro }}</td>
+          </tr>
+          <tr>
+            <td>USt {{ satz }} %</td>
+            <td class="text-end">{{ s.ust | euro }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="fw-bold">
+            <td>Gesamt brutto</td>
+            <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+          </tr>
+        </tbody>
+      </table>
+      {% if marge and darf_kalkulation(request) %}
+      <table class="table table-sm small text-muted mb-0">
+        <tbody>
+          <tr>
+            <td>EK-Summe</td>
+            <td class="text-end">{{ marge.ek_gesamt | euro }}</td>
+          </tr>
+          <tr>
+            <td>Deckungsbeitrag</td>
+            <td class="text-end">{{ marge.deckungsbeitrag | euro }}</td>
+          </tr>
+          <tr>
+            <td>Marge</td>
+            <td class="text-end">{{ marge.marge_prozent | menge }} %</td>
+          </tr>
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
