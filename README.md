@@ -51,7 +51,7 @@ Voraussetzung: Synology mit **Container Manager** (früher „Docker"-Paket), x8
    ```
    Container Manager zeigt das Projekt danach unter „Projekt" an; Start/Stopp geht
    auch über die Oberfläche.
-4. **Aufrufen**: `http://<NAS-IP>:8080` — erster Login `admin` mit dem in `.env`
+4. **Aufrufen**: `http://<NAS-IP>:9999` — erster Login `admin` mit dem in `.env`
    gesetzten Passwort. Passwort danach in der App unter *Mitarbeiter* ändern.
 5. **Updates**: neuen Code holen (`git pull`) und `sudo docker compose up -d --build`.
    Die Datenbank in `./data` bleibt erhalten; Alembic migriert automatisch.

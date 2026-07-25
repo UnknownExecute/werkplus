@@ -5,9 +5,9 @@ services:
     container_name: werkplus
     restart: unless-stopped
     ports:
-      # Host-Port 8080 → Container 8000. Auf der Synology erreichst du die App
-      # dann unter http://<NAS-IP>:8080
-      - "8080:8000"
+      # Host-Port 9999 → Container 8000. Direktzugriff: http://<NAS-IP>:9999
+      # (davor liegt üblicherweise der Synology-Reverse-Proxy für Name/HTTPS).
+      - "9999:8000"
     volumes:
       # Persistente SQLite-Datenbank (überlebt Container-Updates)
       - ./data:/data
