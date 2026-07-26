@@ -1,0 +1,62 @@
+{# Tabellenzeilen der Arbeitszeit-Übersicht (auch HTMX-Ziel #zeiten-tabelle).
+
+   Erwartet: zeilen (Liste von (Zeiterfassung, Benutzer|None)), betrag_map,
+   beleg_namen, pag, ist_admin_ansicht, gefiltert. #}
+{% set spalten = 9 %}
+{% for zeile, mitarbeiter in zeilen %}
+<tr>
+  <td>{{ zeile.datum | datum }}</td>
+  <td>{% if mitarbeiter %}{{ mitarbeiter.name }}{% else %}&mdash;{% endif %}</td>
+  <td>{{ zeile.taetigkeit or '—' }}</td>
+  <td>
+    {% if zeile.beleg_id %}
+    {% if darf_bereich(request, 'verkauf') %}
+    <a href="/belege/detail/{{ zeile.beleg_id }}">{{ beleg_namen.get(zeile.beleg_id, zeile.beleg_id) }}</a>
+    {% else %}{{ beleg_namen.get(zeile.beleg_id, zeile.beleg_id) }}{% endif %}
+    {% else %}<span class="text-muted">ohne Auftrag</span>{% endif %}
+  </td>
+  <td class="text-end">{{ zeile.stunden | menge }}</td>
+  <td class="text-end">{{ zeile.stundensatz | euro }}</td>
+  <td class="text-end">{{ betrag_map.get(zeile.id, 0) | euro }}</td>
+  <td>
+    {% if zeile.verrechnet %}
+    <span class="badge bg-success">verrechnet</span>
+    {% else %}
+    <span class="badge bg-warning text-dark">offen</span>
+    {% endif %}
+  </td>
+  <td class="text-end text-nowrap">
+    {% if darf_bereich(request, 'zeiterfassung', 'bearbeiten') and not zeile.verrechnet %}
+    <a class="btn btn-sm btn-outline-secondary" href="/zeiterfassung/{{ zeile.id }}">Ändern</a>
+    {# Löschen ist unumkehrbar — Rückfrage über den zentralen Listener in werkplus.js. #}
+    <form method="post" action="/zeiterfassung/{{ zeile.id }}/loeschen" class="d-inline">
+      <button class="btn btn-sm btn-outline-danger" type="submit"
+              data-bestaetigen="Arbeitszeit vom {{ zeile.datum | datum }} ({{ zeile.stunden | menge }} Std) wirklich löschen? Die Zeile wird endgültig entfernt und kann nicht mehr verrechnet werden.">
+        Löschen
+      </button>
+    </form>
+    {% else %}
+    <span class="text-muted small">&mdash;</span>
+    {% endif %}
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="{{ spalten }}" class="text-center text-muted py-4">
+    {% if gefiltert %}
+    Für diesen Mitarbeiter sind keine Arbeitszeiten erfasst.<br>
+    <span class="small">Filter auf &bdquo;Alle Mitarbeiter&ldquo; stellen.</span>
+    {% else %}
+    Noch keine Arbeitszeiten erfasst.<br>
+    <span class="small">Mit &bdquo;Zeit erfassen&ldquo; die erste Stunde buchen.</span>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}
+{% if pag and pag.seiten > 1 %}
+<tr>
+  <td colspan="{{ spalten }}" class="bg-body-tertiary">
+    {% include "partials/pagination.html" %}
+  </td>
+</tr>
+{% endif %}

@@ -26,6 +26,7 @@ BEREICHE: tuple[str, ...] = (
     "einkauf",
     "lager",
     "anlagen",
+    "zeiterfassung",
     "einstellungen",
     "benutzer",
 )
@@ -36,6 +37,7 @@ BEREICH_LABELS: dict[str, str] = {
     "einkauf": "Einkauf",
     "lager": "Lager",
     "anlagen": "Anlagen & Service",
+    "zeiterfassung": "Arbeitszeiten",
     "einstellungen": "Einstellungen",
     "benutzer": "Benutzerverwaltung",
 }
@@ -60,5 +62,9 @@ class Rollenprofil(SQLModel, table=True):
     recht_einkauf: Zugriff = Zugriff.KEIN
     recht_lager: Zugriff = Zugriff.KEIN
     recht_anlagen: Zugriff = Zugriff.KEIN
+    # Arbeitszeiterfassung: ANSEHEN/BEARBEITEN gelten für die EIGENEN Zeiten.
+    # Fremde Zeiten sieht und ändert nur ein Admin (ist_admin) — siehe
+    # app/services/zeiterfassung_service.py.
+    recht_zeiterfassung: Zugriff = Zugriff.KEIN
     recht_einstellungen: Zugriff = Zugriff.KEIN
     recht_benutzer: Zugriff = Zugriff.KEIN

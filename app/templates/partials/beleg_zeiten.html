@@ -1,0 +1,59 @@
+{# Kompakte Arbeitszeit-Übersicht im Belegeditor (v. a. Auftrag) + Übernahme.
+
+   Erwartet: zeiten (Liste von (Zeiterfassung, Benutzer|None)), zeiten_betraege,
+   zeiten_summe, zeiten_offen, zeiten_uebernehmbar (siehe _zeiten_kontext). #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>
+      <strong>Erfasste Arbeitszeiten</strong>
+      <span class="text-muted small ms-2">
+        {{ zeiten_summe.stunden | menge }} Std &middot; {{ zeiten_summe.betrag | euro }} &euro; gesamt
+        {%- if zeiten_offen.anzahl %},
+        davon offen {{ zeiten_offen.stunden | menge }} Std
+        ({{ zeiten_offen.betrag | euro }} &euro;){% endif %}
+      </span>
+    </span>
+    {% if zeiten_uebernehmbar %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/zeiten-uebernehmen"
+          data-bestaetigen="{{ zeiten_offen.anzahl }} offene Arbeitszeit(en) als Positionen übernehmen? Die Zeilen werden dabei als verrechnet markiert und können danach nicht mehr geändert werden.">
+      <button class="btn btn-sm btn-primary" type="submit">Zeiten übernehmen</button>
+    </form>
+    {% elif zeiten_offen and zeiten_offen.anzahl and not bearbeitbar %}
+    <span class="text-muted small">Beleg gebucht — Übernahme nicht mehr möglich.</span>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm tabelle-kompakt mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Mitarbeiter</th>
+          <th>Tätigkeit</th>
+          <th class="text-end">Stunden</th>
+          <th class="text-end">Satz</th>
+          <th class="text-end">Betrag</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for zeile, mitarbeiter in zeiten %}
+        <tr>
+          <td>{{ zeile.datum | datum }}</td>
+          <td>{% if mitarbeiter %}{{ mitarbeiter.name }}{% else %}&mdash;{% endif %}</td>
+          <td>{{ zeile.taetigkeit or '—' }}</td>
+          <td class="text-end">{{ zeile.stunden | menge }}</td>
+          <td class="text-end">{{ zeile.stundensatz | euro }}</td>
+          <td class="text-end">{{ zeiten_betraege.get(zeile.id, 0) | euro }}</td>
+          <td>
+            {% if zeile.verrechnet %}
+            <span class="badge bg-success">verrechnet</span>
+            {% else %}
+            <span class="badge bg-warning text-dark">offen</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

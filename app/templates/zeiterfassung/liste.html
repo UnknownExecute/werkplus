@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Arbeitszeiten{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Arbeitszeiten</h1>
+  {% if darf_bereich(request, 'zeiterfassung', 'bearbeiten') %}
+  <a class="btn btn-primary" href="/zeiterfassung/neu">Zeit erfassen</a>
+  {% endif %}
+</div>
+
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
+
+<div class="row g-2 align-items-end mb-3">
+  {% if ist_admin_ansicht %}
+  <div class="col-md-4">
+    <label class="form-label" for="mitarbeiter">Mitarbeiter</label>
+    <select class="form-select" id="mitarbeiter" name="mitarbeiter"
+            hx-get="/zeiterfassung/zeilen" hx-trigger="change"
+            hx-target="#zeiten-tabelle" hx-swap="innerHTML">
+      <option value="alle"{% if not mitarbeiter or mitarbeiter == 'alle' %} selected{% endif %}>
+        Alle Mitarbeiter
+      </option>
+      {% for m in mitarbeiter_liste %}
+      <option value="{{ m.id }}"{% if mitarbeiter == m.id | string %} selected{% endif %}>
+        {{ m.name }} ({{ m.login }})
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% else %}
+  <div class="col-md-6">
+    <div class="text-muted small">Angezeigt werden ausschließlich Ihre eigenen Arbeitszeiten.</div>
+  </div>
+  {% endif %}
+  <div class="col-md-auto ms-auto">
+    <div class="text-md-end">
+      <div class="text-muted small">Summe (alle Treffer)</div>
+      <div class="fs-5">
+        {{ summe.stunden | menge }} Std &middot; {{ summe.betrag | euro }} &euro;
+      </div>
+      <div class="text-muted small">
+        {{ summe.anzahl }} Zeile(n), davon {{ summe.offene_anzahl }} noch nicht verrechnet
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead>
+    <tr>
+      <th>Datum</th>
+      <th>Mitarbeiter</th>
+      <th>Tätigkeit</th>
+      <th>Auftrag</th>
+      <th class="text-end">Stunden</th>
+      <th class="text-end">Satz</th>
+      <th class="text-end">Betrag</th>
+      <th>Status</th>
+      <th class="text-end">Aktion</th>
+    </tr>
+  </thead>
+  <tbody id="zeiten-tabelle">
+    {% include "partials/zeiterfassung_zeilen.html" %}
+  </tbody>
+</table>
+{% endblock %}

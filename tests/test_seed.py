@@ -7,11 +7,16 @@ from app.models import (
     Anlage,
     Artikel,
     Beleg,
+    Belegart,
+    BelegStatus,
     Benutzer,
     Lager,
     Lagerbestand,
+    Rollenprofil,
     Seriennummer,
     SnStatus,
+    Zeiterfassung,
+    Zugriff,
 )
 from app.services import beleg_service
 from scripts import seed
@@ -28,7 +33,10 @@ def _hooks_aufraeumen():
 def test_seed_legt_alle_stammdaten_an(session):
     seed.run(session)
 
-    assert session.exec(select(func.count()).select_from(Benutzer)).one() == 2
+    # admin, sb, mo (Monteur für die Zeiterfassungs-Demo)
+    assert session.exec(select(func.count()).select_from(Benutzer)).one() == 3
+    # Jeder Demo-Benutzer hat einen Stundensatz — sonst wären erfasste Zeiten wertlos
+    assert all(b.stundensatz > 0 for b in session.exec(select(Benutzer)).all())
     kunden = session.exec(
         select(func.count()).select_from(Adresse).where(Adresse.typ == AdressTyp.KUNDE)
     ).one()
@@ -70,20 +78,51 @@ def test_seed_legt_alle_stammdaten_an(session):
 def test_seed_demo_durchlauf_legt_belegkette_und_anlagen_an(session):
     seed.run(session)
 
-    # Angebot→Auftrag→Lieferschein→Rechnung = 4 Belege
-    assert session.exec(select(func.count()).select_from(Beleg)).one() == 4
+    # Angebot→Auftrag→Lieferschein→Rechnung = 4 Belege + Regie-Auftrag (Zeiterfassung)
+    assert session.exec(select(func.count()).select_from(Beleg)).one() == 5
     # 2 Demo-Anlagen (eine fällig, eine überfällig)
     anlagen = session.exec(select(Anlage)).all()
     assert len(anlagen) == 2
     assert all(a.naechste_wartung is not None for a in anlagen)
 
 
+def test_seed_legt_demo_arbeitszeiten_auf_offenem_auftrag_an(session):
+    """Die Demo-Zeiten hängen an einem Auftrag im Entwurf und sind noch offen.
+
+    Nur so lässt sich „Zeiten übernehmen" im Auftragseditor ausprobieren.
+    """
+    seed.run(session)
+
+    zeiten = session.exec(select(Zeiterfassung)).all()
+    assert len(zeiten) == 3
+    assert all(not z.verrechnet for z in zeiten)
+    assert all(z.stunden > 0 and z.stundensatz > 0 for z in zeiten)
+    beleg_ids = {z.beleg_id for z in zeiten}
+    assert len(beleg_ids) == 1 and None not in beleg_ids
+    auftrag = session.get(Beleg, beleg_ids.pop())
+    assert auftrag.belegart == Belegart.AUFTRAG
+    assert auftrag.status == BelegStatus.ENTWURF
+    # Zwei verschiedene Mitarbeiter — zeigt die Admin-Sicht auf fremde Zeiten
+    assert len({z.benutzer_id for z in zeiten}) == 2
+
+
+def test_seed_rollen_haben_zeiterfassungsrecht(session):
+    """sachbearbeiter und monteur dürfen eigene Zeiten erfassen, admin alles."""
+    seed.run(session)
+
+    rollen = {r.name: r for r in session.exec(select(Rollenprofil)).all()}
+    assert rollen["sachbearbeiter"].recht_zeiterfassung == Zugriff.BEARBEITEN
+    assert rollen["monteur"].recht_zeiterfassung == Zugriff.BEARBEITEN
+    assert rollen["admin"].ist_admin is True
+
+
 def test_seed_ist_idempotent(session):
     seed.run(session)
     seed.run(session)
     assert session.exec(select(func.count()).select_from(Artikel)).one() == 21  # 20 + Demo-Set
-    assert session.exec(select(func.count()).select_from(Benutzer)).one() == 2
+    assert session.exec(select(func.count()).select_from(Benutzer)).one() == 3
     # 15 Stammdaten-SNs + 2 Demo-Anlagen-SNs, auch nach zweitem Lauf
     assert session.exec(select(func.count()).select_from(Seriennummer)).one() == 17
-    assert session.exec(select(func.count()).select_from(Beleg)).one() == 4
+    assert session.exec(select(func.count()).select_from(Beleg)).one() == 5
     assert session.exec(select(func.count()).select_from(Anlage)).one() == 2
+    assert session.exec(select(func.count()).select_from(Zeiterfassung)).one() == 3

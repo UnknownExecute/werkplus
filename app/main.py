@@ -26,6 +26,7 @@ from app.routers import (
     lager,
     suche,
     textbausteine,
+    zeiterfassung,
 )
 from app.security import csrf_schutz, sicherheits_header
 from app.services.buchung import registriere_lager_hooks
@@ -64,6 +65,7 @@ app.include_router(aktivitaeten.router)
 app.include_router(belege.router)
 app.include_router(lager.router)
 app.include_router(anlagen.router)
+app.include_router(zeiterfassung.router)
 app.include_router(suche.router)
 app.include_router(einstellungen.router)
 app.include_router(textbausteine.router)

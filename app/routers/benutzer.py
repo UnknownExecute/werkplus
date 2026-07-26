@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.dependencies import get_current_user, ist_admin
+from app.formparse import parse_betrag
 from app.models import (
     BEREICH_LABELS,
     BEREICHE,
@@ -83,17 +84,23 @@ def benutzer_neu_form(
 
 
 @router.post("/neu")
-def benutzer_neu(
+def benutzer_neu(  # noqa: PLR0913
     request: Request,
     login: str = Form(...),
     name: str = Form(...),
     rolle: str = Form(""),
     passwort: str = Form(...),
+    stundensatz: str = Form("0"),
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     login = login.strip()
-    anzeige = Benutzer(login=login, name=name.strip(), passwort_hash="", rolle=rolle, aktiv=True)
+    # Verrechnungssatz der Arbeitszeiterfassung (Wertebereich über parse_betrag).
+    satz = parse_betrag(stundensatz, "Stundensatz")
+    anzeige = Benutzer(
+        login=login, name=name.strip(), passwort_hash="", rolle=rolle, aktiv=True,
+        stundensatz=satz,
+    )
     if session.exec(select(Benutzer).where(Benutzer.login == login)).first() is not None:
         return templates.TemplateResponse(
             request,
@@ -111,6 +118,7 @@ def benutzer_neu(
         passwort_hash=hash_passwort(passwort),
         rolle=rolle,
         aktiv=True,
+        stundensatz=satz,
     )
     session.add(neuer)
     session.commit()
@@ -337,6 +345,7 @@ def benutzer_bearbeiten(
     rolle: str = Form(""),
     passwort: str = Form(""),
     aktiv: bool = Form(False),
+    stundensatz: str = Form("0"),
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -364,6 +373,7 @@ def benutzer_bearbeiten(
         )
     obj.name = name.strip()
     obj.rolle = rolle
+    obj.stundensatz = parse_betrag(stundensatz, "Stundensatz")
     # Sich selbst nicht deaktivieren — eigene Deaktivierung wird ignoriert.
     obj.aktiv = neu_aktiv
     if passwort.strip():

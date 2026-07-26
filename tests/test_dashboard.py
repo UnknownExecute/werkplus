@@ -43,9 +43,12 @@ def test_dashboard_nach_seed(engine, client):
 
     r = client.get("/")
     assert r.status_code == 200
-    # Die Demo-Kette ist komplett durchgelaufen — nichts ist mehr offen
+    # Die Demo-Kette ist komplett durchgelaufen — kein Angebot bleibt offen
     assert "Keine offenen Angebote" in r.text
-    assert "Keine unfertigen Aufträge" in r.text
+    # Der Regie-Auftrag der Zeiterfassungs-Demo bleibt bewusst im Entwurf offen
+    # (nur dort lässt sich „Zeiten übernehmen" ausprobieren) und erscheint daher
+    # in der Auftragskachel.
+    assert "Keine unfertigen Aufträge" not in r.text
     # Fällige Wartungen: beide Demo-Anlagen, die überfällige rot markiert
     assert "Bäckerei Brotherz e.U." in r.text
     assert "Gasthof Post KG" in r.text

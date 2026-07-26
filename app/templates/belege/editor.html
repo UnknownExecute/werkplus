@@ -138,6 +138,10 @@
 <div id="folgebeleg-dialog"></div>
 <div id="abschlag-dialog"></div>
 
+{% if zeiten_sichtbar and zeiten %}
+{% include "partials/beleg_zeiten.html" %}
+{% endif %}
+
 {% include "partials/positionsgrid.html" %}
 
 <div id="position-detail">

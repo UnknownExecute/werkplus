@@ -29,6 +29,14 @@ class StornoNichtMoeglich(WerkplusFehler):
     """Der Storno ist fachlich nicht möglich (z. B. Seriennummern bereits verkauft)."""
 
 
+class ZeitBereitsVerrechnet(WerkplusFehler):
+    """Änderung/Löschung einer Arbeitszeit, die schon als Belegposition steht.
+
+    Eine verrechnete Zeile ist Teil eines Belegs. Sie nachträglich zu ändern
+    würde Erfassung und Rechnung auseinanderlaufen lassen — deshalb gesperrt.
+    """
+
+
 class LagerbuchungFehlgeschlagen(WerkplusFehler):
     """Bestandsfortschreibung war auch nach mehreren Versuchen nicht möglich.
 

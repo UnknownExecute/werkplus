@@ -44,6 +44,7 @@ from app.services import (
     berechnung,
     lager_service,
     seriennummer_service,
+    zeiterfassung_service,
 )
 from app.services.berechtigung import (  # noqa: E402
     bereich_wache,
@@ -166,31 +167,43 @@ def _bereich_fuer(belegart: Belegart) -> str:
     return "verkauf" if belegart in VERKAUFSARTEN else "einkauf"
 
 
-def _pruefe_belegart_recht(request: Request, session: Session, belegart: Belegart) -> None:
-    """Erzwingt das Recht am konkreten Bereich der Belegart.
-
-    Die Router-Wache prüft nur "verkauf ODER einkauf". Ohne diese objektbezogene
-    Prüfung könnte ein Nutzer mit ausschließlich Verkaufsrecht Einkaufsbelege
-    lesen/ändern (und umgekehrt).
+def _hat_recht(request: Request, session: Session, bereich: str, mindestens: Zugriff) -> bool:
+    """Hat der angemeldete Benutzer im Bereich mindestens diese Stufe?
 
     Die Rechte werden bewusst **frisch aus der Datenbank** gelesen (wie in
     ``bereich_wache``) und nicht aus der Session: Eine Durchsetzungsprüfung darf
     einem Rechteentzug nicht bis zum nächsten Login nachhinken. Die Session-
     Variante (``darf_bereich``) bleibt der Template-Anzeige vorbehalten.
     """
-    bereich = _bereich_fuer(belegart)
+    benutzer_id = request.session.get("benutzer_id")
+    benutzer = session.get(Benutzer, benutzer_id) if benutzer_id else None
+    if benutzer is None:
+        return False
+    return darf(lade_profil(session, benutzer), bereich, mindestens)
+
+
+def _pruefe_recht(request: Request, session: Session, bereich: str, mindestens: Zugriff) -> None:
+    """Wie :func:`_hat_recht`, wirft aber 403 statt False zu liefern."""
+    if not _hat_recht(request, session, bereich, mindestens):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Keine Berechtigung für: {bereich}.",
+        )
+
+
+def _pruefe_belegart_recht(request: Request, session: Session, belegart: Belegart) -> None:
+    """Erzwingt das Recht am konkreten Bereich der Belegart.
+
+    Die Router-Wache prüft nur "verkauf ODER einkauf". Ohne diese objektbezogene
+    Prüfung könnte ein Nutzer mit ausschließlich Verkaufsrecht Einkaufsbelege
+    lesen/ändern (und umgekehrt).
+    """
     mindestens = (
         Zugriff.BEARBEITEN
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}
         else Zugriff.ANSEHEN
     )
-    benutzer_id = request.session.get("benutzer_id")
-    benutzer = session.get(Benutzer, benutzer_id) if benutzer_id else None
-    if benutzer is None or not darf(lade_profil(session, benutzer), bereich, mindestens):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Keine Berechtigung für: {bereich}.",
-        )
+    _pruefe_recht(request, session, _bereich_fuer(belegart), mindestens)
 
 
 def _belegart_mit_recht(belegart: str, request: Request, session: Session) -> Belegart:
@@ -433,6 +446,34 @@ def _parse_datum(text: str | None) -> date | None:
         ) from exc
 
 
+def _zeiten_kontext(request: Request, session: Session, beleg: Beleg) -> dict:
+    """Erfasste Arbeitszeiten des Belegs (kompakt) samt Übernahme-Möglichkeit.
+
+    Die Karte zeigt Zeiten FREMDER Mitarbeiter (der Auftrag ist der Sammelbeleg der
+    Regie) und ist deshalb an ``recht_zeiterfassung`` gebunden — ansehen zum
+    Anzeigen, bearbeiten für die Übernahme. Zusammen mit dem Verkaufsrecht des
+    Belege-Routers heißt das: ein Monteur (kein Verkaufsrecht) kommt hier gar nicht
+    hin und sieht fremde Zeiten weiterhin nirgends.
+    """
+    if not _hat_recht(request, session, "zeiterfassung", Zugriff.ANSEHEN):
+        return {"zeiten_sichtbar": False, "zeiten": [], "zeiten_summe": None}
+    zeilen = zeiterfassung_service.zeilen_je_beleg_mit_benutzer(session, beleg.id)
+    summe = zeiterfassung_service.summiere([z for z, _ in zeilen])
+    offen = zeiterfassung_service.summiere([z for z, _ in zeilen if not z.verrechnet])
+    return {
+        "zeiten_sichtbar": True,
+        "zeiten": zeilen,
+        "zeiten_betraege": {z.id: zeiterfassung_service.zeilen_betrag(z) for z, _ in zeilen},
+        "zeiten_summe": summe,
+        "zeiten_offen": offen,
+        "zeiten_uebernehmbar": (
+            offen.anzahl > 0
+            and beleg.status == BelegStatus.ENTWURF
+            and _hat_recht(request, session, "zeiterfassung", Zugriff.BEARBEITEN)
+        ),
+    }
+
+
 # ---------------------------------------------------------------- Liste + Anlage
 
 
@@ -479,6 +520,7 @@ def beleg_editor(
             "zahlstatus_labels": ZAHLSTATUS_LABELS,
         }
     )
+    kontext.update(_zeiten_kontext(request, session, beleg))
     return templates.TemplateResponse(request, "belege/editor.html", kontext)
 
 
@@ -1080,6 +1122,34 @@ async def folgebeleg_erzeugen(
         return _editor_redirect(beleg_id, fehler=str(exc))
     session.commit()
     return _editor_redirect(neu.id)
+
+
+# -------------------------------------------------------- Arbeitszeiten übernehmen
+
+
+@router.post("/detail/{beleg_id}/zeiten-uebernehmen")
+def zeiten_uebernehmen(
+    request: Request,
+    beleg_id: int,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Erzeugt aus den offenen Arbeitszeiten des Belegs Positionen (je Zeile eine).
+
+    Zusätzlich zum Verkaufsrecht des Routers wird ``recht_zeiterfassung`` auf
+    Stufe BEARBEITEN verlangt — die Übernahme liest und entwertet fremde
+    Zeiterfassungszeilen. Gesperrte (gedruckte) Belege und ein zweiter Klick
+    ergeben eine fachliche Meldung, keinen 500er.
+    """
+    beleg = _lade_beleg(session, beleg_id, request)
+    _pruefe_recht(request, session, "zeiterfassung", Zugriff.BEARBEITEN)
+    try:
+        zeiterfassung_service.uebernehme_in_beleg(session, beleg)
+    except WerkplusFehler as exc:  # inkl. BelegGesperrt (gedruckter Beleg)
+        session.rollback()
+        return _editor_redirect(beleg_id, fehler=str(exc))
+    session.commit()
+    return _editor_redirect(beleg_id)
 
 
 # -------------------------------------------------- Abschlags-/Schlussrechnung (Kplus)

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{% if neu %}Zeit erfassen{% else %}Arbeitszeit ändern{% endif %}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">{% if neu %}Zeit erfassen{% else %}Arbeitszeit ändern{% endif %}</h1>
+  <a class="btn btn-outline-secondary" href="/zeiterfassung">Zur Übersicht</a>
+</div>
+
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
+{% if not neu and zeile.verrechnet %}
+<div class="alert alert-info">
+  Diese Arbeitszeit ist bereits als Belegposition verrechnet und deshalb unveränderlich.
+</div>
+{% endif %}
+
+{% set gesperrt = (not neu and zeile.verrechnet) %}
+<form method="post"
+      action="{% if neu %}/zeiterfassung/neu{% else %}/zeiterfassung/{{ zeile.id }}{% endif %}"
+      class="col-lg-8">
+  <div class="row g-3">
+    {% if ist_admin_ansicht and neu %}
+    <div class="col-md-6">
+      <label class="form-label" for="benutzer_id">Mitarbeiter</label>
+      <select class="form-select" id="benutzer_id" name="benutzer_id">
+        {% for m in mitarbeiter_liste %}
+        <option value="{{ m.id }}"{% if zeile.benutzer_id == m.id %} selected{% endif %}>
+          {{ m.name }} ({{ m.login }})
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">
+        Als Administrator können Sie Zeiten für andere Mitarbeiter buchen.
+        Der Stundensatz unten wird nicht automatisch nachgeladen — bitte prüfen.
+      </div>
+    </div>
+    {% endif %}
+    <div class="col-md-3">
+      <label class="form-label" for="datum">Datum</label>
+      <input class="form-control" type="date" id="datum" name="datum"
+             value="{{ zeile.datum.isoformat() }}" {% if gesperrt %}disabled{% endif %} required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="stunden">Stunden</label>
+      <input class="form-control text-end" id="stunden" name="stunden" inputmode="decimal"
+             value="{{ zeile.stunden | menge }}" placeholder="z. B. 2,5"
+             {% if gesperrt %}disabled{% endif %} required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="stundensatz">Stundensatz (netto)</label>
+      <input class="form-control text-end" id="stundensatz" name="stundensatz" inputmode="decimal"
+             value="{{ zeile.stundensatz | euro }}" {% if gesperrt %}disabled{% endif %}>
+      <div class="form-text">Vorbelegt aus dem Mitarbeiterstamm, hier überschreibbar.</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="taetigkeit">Tätigkeit</label>
+      <input class="form-control" id="taetigkeit" name="taetigkeit" value="{{ zeile.taetigkeit }}"
+             placeholder="z. B. Therme montiert, Regiearbeit"
+             {% if gesperrt %}disabled{% endif %}>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="beleg_id">Auftrag</label>
+      <select class="form-select" id="beleg_id" name="beleg_id" {% if gesperrt %}disabled{% endif %}>
+        <option value=""{% if not zeile.beleg_id %} selected{% endif %}>&mdash; ohne Auftrag &mdash;</option>
+        {% for beleg, adresse in auftraege %}
+        <option value="{{ beleg.id }}"{% if zeile.beleg_id == beleg.id %} selected{% endif %}>
+          {{ beleg.belegnr }}{% if adresse %} — {{ adresse.firma }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-text">
+        Nur Zeiten mit Auftrag können später als Position übernommen werden.
+      </div>
+    </div>
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-primary" type="submit" {% if gesperrt %}disabled{% endif %}>
+      Speichern
+    </button>
+    <a class="btn btn-outline-secondary" href="/zeiterfassung">Abbrechen</a>
+  </div>
+</form>
+{% endblock %}

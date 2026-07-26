@@ -3,7 +3,8 @@
 Aufruf:  python -m uv run python -m scripts.seed
 Der Seed ist idempotent — vorhandene Daten (per Artikelnr./Login/Firma erkannt) werden übersprungen.
 Zusätzlich (M5): Demo-Belegdurchlauf Angebot→Auftrag→Lieferschein→Rechnung über die
-Services (inkl. Lagerbuchung) sowie zwei Demo-Anlagen für das Dashboard.
+Services (inkl. Lagerbuchung), zwei Demo-Anlagen für das Dashboard sowie ein
+Regie-Auftrag im Entwurf mit erfassten Arbeitszeiten (Zeiterfassung).
 """
 
 from datetime import date, timedelta
@@ -29,14 +30,22 @@ from app.models import (
     Rolle,
     Seriennummer,
     SnStatus,
+    Zeiterfassung,
 )
-from app.services import beleg_service, berechnung, seriennummer_service
+from app.services import (
+    beleg_service,
+    berechnung,
+    seriennummer_service,
+    zeiterfassung_service,
+)
 from app.services.auth_service import hash_passwort
 from app.services.buchung import registriere_lager_hooks
 
+# (login, name, passwort, rolle, stundensatz) — Stundensätze für die Zeiterfassung
 BENUTZER = [
-    ("admin", "Administrator", "admin", Rolle.ADMIN),
-    ("sb", "Susi Bearbeiter", "sb", Rolle.SACHBEARBEITER),
+    ("admin", "Administrator", "admin", Rolle.ADMIN, "95.00"),
+    ("sb", "Susi Bearbeiter", "sb", Rolle.SACHBEARBEITER, "78.00"),
+    ("mo", "Max Monteur", "mo", "monteur", "68.00"),
 ]
 
 KUNDEN = [
@@ -80,11 +89,14 @@ ARTIKEL = [
 
 
 def seed_benutzer(session: Session) -> None:
-    for login, name, passwort, rolle in BENUTZER:
+    for login, name, passwort, rolle, stundensatz in BENUTZER:
         if session.exec(select(Benutzer).where(Benutzer.login == login)).first():
             continue
         session.add(
-            Benutzer(login=login, name=name, passwort_hash=hash_passwort(passwort), rolle=rolle)
+            Benutzer(
+                login=login, name=name, passwort_hash=hash_passwort(passwort), rolle=rolle,
+                stundensatz=Decimal(stundensatz),
+            )
         )
 
 
@@ -259,6 +271,43 @@ def seed_demo_durchlauf(session: Session) -> None:
     beleg_service.setze_status(session, rechnung, BelegStatus.GEDRUCKT)
 
     _seed_demo_anlagen(session)
+    _seed_demo_zeiten(session)
+
+
+# (Login des Mitarbeiters, Tage vor heute, Stunden, Tätigkeit)
+DEMO_ZEITEN = [
+    ("mo", 2, "4.5", "Therme demontiert, Anschlüsse vorbereitet"),
+    ("mo", 1, "7.25", "Neue Therme montiert und in Betrieb genommen"),
+    ("sb", 1, "1.5", "Einweisung Kunde, Protokoll erstellt"),
+]
+
+
+def _seed_demo_zeiten(session: Session) -> None:
+    """Regie-Auftrag im Entwurf mit drei erfassten Arbeitszeiten.
+
+    Bewusst ein EIGENER Auftrag im Status Entwurf: nur dort lässt sich „Zeiten
+    übernehmen" ausprobieren (der Auftrag der Demo-Belegkette ist am Ende erledigt
+    und damit unveränderlich).
+    """
+    kunde = _hole_kunde(session, "Gasthof Post KG")
+    material = _hole_artikel(session, "DL-9005")
+    auftrag = beleg_service.erstelle_beleg(
+        session, Belegart.AUFTRAG, kunde,
+        kopftext="Regiearbeiten Heizungstausch (Demo für die Arbeitszeiterfassung)",
+    )
+    beleg_service.fuege_position_hinzu(session, auftrag, material, menge=Decimal("2"))
+
+    for login, tage, stunden, taetigkeit in DEMO_ZEITEN:
+        mitarbeiter = session.exec(select(Benutzer).where(Benutzer.login == login)).one()
+        zeiterfassung_service.erfasse_zeit(
+            session,
+            benutzer_id=mitarbeiter.id,
+            beleg_id=auftrag.id,
+            datum=date.today() - timedelta(days=tage),
+            stunden=Decimal(stunden),
+            stundensatz=mitarbeiter.stundensatz,
+            taetigkeit=taetigkeit,
+        )
 
 
 # (kuerzel, titel, text, kategorie)
@@ -316,17 +365,21 @@ def seed_set_artikel(session: Session) -> None:
 
 
 def seed_rollen(session: Session) -> None:
-    """Zwei eingebaute Standardrollen (idempotent) — bei create_all statt Migration."""
-    from app.models import Rollenprofil, Zugriff
+    """Drei Rollen (idempotent) — bei create_all statt Migration.
+
+    ``recht_zeiterfassung`` steht bei sachbearbeiter UND monteur auf BEARBEITEN:
+    beide sollen ihre eigenen Arbeitszeiten erfassen und korrigieren können.
+    Fremde Zeiten sieht dadurch niemand — das bleibt dem Admin vorbehalten
+    (siehe app/services/zeiterfassung_service.py).
+    """
+    from app.models import BEREICHE, Rollenprofil, Zugriff
 
     vorhanden = {r.name for r in session.exec(select(Rollenprofil)).all()}
     if "admin" not in vorhanden:
         session.add(Rollenprofil(
             name="admin", beschreibung="Vollzugriff", ist_admin=True, ist_standard=True,
             darf_kalkulation_sehen=True,
-            **{f"recht_{b}": Zugriff.BEARBEITEN for b in
-               ("adressen", "artikel", "verkauf", "einkauf", "lager", "anlagen",
-                "einstellungen", "benutzer")},
+            **{f"recht_{b}": Zugriff.BEARBEITEN for b in BEREICHE},
         ))
     if "sachbearbeiter" not in vorhanden:
         session.add(Rollenprofil(
@@ -335,16 +388,18 @@ def seed_rollen(session: Session) -> None:
             recht_adressen=Zugriff.BEARBEITEN, recht_artikel=Zugriff.BEARBEITEN,
             recht_verkauf=Zugriff.BEARBEITEN, recht_einkauf=Zugriff.BEARBEITEN,
             recht_lager=Zugriff.BEARBEITEN, recht_anlagen=Zugriff.BEARBEITEN,
+            recht_zeiterfassung=Zugriff.BEARBEITEN,
             recht_einstellungen=Zugriff.KEIN, recht_benutzer=Zugriff.KEIN,
         ))
     if "monteur" not in vorhanden:
         # Beispiel für eine eingeschränkte Rolle: nur Service, keine Preise/Marge
         session.add(Rollenprofil(
-            name="monteur", beschreibung="Monteur: Anlagen & Service, Lager nur ansehen",
+            name="monteur", beschreibung="Monteur: Anlagen, Service & eigene Arbeitszeiten",
             ist_admin=False, ist_standard=False, darf_kalkulation_sehen=False,
             recht_adressen=Zugriff.ANSEHEN, recht_artikel=Zugriff.ANSEHEN,
             recht_verkauf=Zugriff.KEIN, recht_einkauf=Zugriff.KEIN,
             recht_lager=Zugriff.ANSEHEN, recht_anlagen=Zugriff.BEARBEITEN,
+            recht_zeiterfassung=Zugriff.BEARBEITEN,
             recht_einstellungen=Zugriff.KEIN, recht_benutzer=Zugriff.KEIN,
         ))
 
@@ -367,8 +422,9 @@ def main() -> None:
         run(session)
         anzahl_belege = len(session.exec(select(Beleg)).all())
         anzahl_anlagen = len(session.exec(select(Anlage)).all())
-    print("Seed abgeschlossen. Logins: admin/admin, sb/sb")
-    print(f"Belege: {anzahl_belege}, Anlagen: {anzahl_anlagen}")
+        anzahl_zeiten = len(session.exec(select(Zeiterfassung)).all())
+    print("Seed abgeschlossen. Logins: admin/admin, sb/sb, mo/mo")
+    print(f"Belege: {anzahl_belege}, Anlagen: {anzahl_anlagen}, Arbeitszeiten: {anzahl_zeiten}")
 
 
 if __name__ == "__main__":

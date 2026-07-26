@@ -31,6 +31,14 @@
              {% if neu %}required{% endif %}
              placeholder="{% if not neu %}Nur ausfüllen zum Ändern{% endif %}">
     </div>
+    <div class="col-md-6">
+      <label class="form-label" for="stundensatz">Stundensatz (netto)</label>
+      <input class="form-control text-end" id="stundensatz" name="stundensatz"
+             inputmode="decimal" value="{{ benutzer.stundensatz | euro }}">
+      <div class="form-text">
+        Verrechnungssatz für die Arbeitszeiterfassung; je Zeitzeile überschreibbar.
+      </div>
+    </div>
     {% if not neu %}
     <div class="col-12">
       <div class="form-check">

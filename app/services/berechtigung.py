@@ -48,6 +48,7 @@ def _fallback_profil(rolle_name: str) -> Rollenprofil:
         "recht_einkauf": Zugriff.BEARBEITEN,
         "recht_lager": Zugriff.BEARBEITEN,
         "recht_anlagen": Zugriff.BEARBEITEN,
+        "recht_zeiterfassung": Zugriff.BEARBEITEN,
         "recht_einstellungen": Zugriff.KEIN,
         "recht_benutzer": Zugriff.KEIN,
     }
