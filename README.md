@@ -54,8 +54,14 @@ Voraussetzung: Synology mit **Container Manager** (früher „Docker"-Paket), x8
    auch über die Oberfläche.
 4. **Aufrufen**: `http://<NAS-IP>:9999` — erster Login `admin` mit dem in `.env`
    gesetzten Passwort. Passwort danach in der App unter *Mitarbeiter* ändern.
-5. **Updates**: neuen Code holen (`git pull`) und `sudo docker compose up -d --build`.
-   Die Datenbank in `./data` bleibt erhalten; Alembic migriert automatisch.
+5. **Updates**: Ein `git push` aktualisiert nur GitHub — die NAS holt den neuen
+   Stand nicht von selbst. Auf der NAS im Projektordner genügt dafür ein Befehl:
+   ```bash
+   sudo ./update.sh
+   ```
+   Das Skript lädt den aktuellen `main`-Stand von GitHub (Token aus `.env`), baut
+   das Image neu und startet den Container. Die Datenbank in `./data` und die
+   `.env` bleiben erhalten; Alembic migriert das Schema beim Start automatisch.
 
 Die Daten liegen dauerhaft im NAS-Ordner `./data` (SQLite-DB + Bug-Screenshots) —
 in die Synology-Backup-Aufgaben (Hyper Backup) mit aufnehmen.
