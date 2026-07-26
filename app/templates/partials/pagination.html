@@ -1,0 +1,36 @@
+{# Wiederverwendbare Blätter-Navigation (Bootstrap 5).
+
+   Erwartet `pag` (app.pagination.Blaetterwerk). Bei nur einer Seite wird
+   bewusst nichts gerendert. Sind `pag.htmx_basis` und `pag.htmx_target`
+   gesetzt, blättert HTMX das Ziel nach; sonst greifen normale Links
+   (die href bleibt in beiden Fällen als Fallback erhalten). #}
+{% macro blatt_link(pag, nr, text, aria) -%}
+<a class="page-link" href="{{ pag.basis }}seite={{ nr }}" aria-label="{{ aria }}"
+   {% if pag.htmx_basis %}hx-get="{{ pag.htmx_basis }}seite={{ nr }}"
+   hx-target="{{ pag.htmx_target }}" hx-swap="innerHTML"{% endif %}>{{ text }}</a>
+{%- endmacro %}
+
+{% if pag and pag.seiten > 1 %}
+<nav class="d-flex flex-wrap align-items-center gap-3" aria-label="Blättern">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item{% if not pag.hat_zurueck %} disabled{% endif %}">
+      {% if pag.hat_zurueck %}{{ blatt_link(pag, pag.seite - 1, "Zurück", "Vorige Seite") }}
+      {% else %}<span class="page-link">Zurück</span>{% endif %}
+    </li>
+    {% for nr in pag.fenster %}
+    <li class="page-item{% if nr == pag.seite %} active{% endif %}">
+      {% if nr == pag.seite %}<span class="page-link" aria-current="page">{{ nr }}</span>
+      {% else %}{{ blatt_link(pag, nr, nr, "Seite " ~ nr) }}{% endif %}
+    </li>
+    {% endfor %}
+    <li class="page-item{% if not pag.hat_weiter %} disabled{% endif %}">
+      {% if pag.hat_weiter %}{{ blatt_link(pag, pag.seite + 1, "Weiter", "Nächste Seite") }}
+      {% else %}<span class="page-link">Weiter</span>{% endif %}
+    </li>
+  </ul>
+  <span class="text-muted small">
+    Seite {{ pag.seite }} von {{ pag.seiten }} &middot;
+    Einträge {{ pag.von }}&ndash;{{ pag.bis }} von {{ pag.gesamt }}
+  </span>
+</nav>
+{% endif %}

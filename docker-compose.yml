@@ -18,3 +18,17 @@ services:
     environment:
       # WERKPLUS_ENV=production erzwingt einen sicheren Secret-Key (siehe .env)
       WERKPLUS_ENV: "production"
+    # Zustandsprüfung über GET /health (ohne Login erreichbar, prüft die Datenbank).
+    # Kein curl im Slim-Image — daher der Python-Aufruf; urlopen wirft bei 503,
+    # der Exit-Code wird dann != 0 und der Container gilt als "unhealthy".
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Erststart braucht Zeit für Alembic-Migration und Produktions-Init.
+      start_period: 60s

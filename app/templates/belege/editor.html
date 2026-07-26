@@ -12,7 +12,10 @@
   </h1>
   <div class="d-flex gap-2 flex-wrap">
     {% if beleg.status == 'entwurf' %}
-    <form method="post" action="/belege/detail/{{ beleg.id }}/status/gedruckt">
+    {# Buchen friert die Summen ein und macht den Beleg unveränderlich —
+       bei Liefer-/Wareneingangsscheinen werden zusätzlich Lagerbestände gebucht. #}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/status/gedruckt"
+          data-bestaetigen="{{ label }} {{ beleg.belegnr }} jetzt buchen? Danach ist der Beleg unveränderlich und die Summen sind fixiert.{% if beleg.belegart in ('lieferschein', 'ek_lieferschein') %} Die Lagerbewegungen werden sofort gebucht.{% endif %}">
       <button class="btn btn-primary" type="submit">Drucken/Buchen</button>
     </form>
     {% endif %}
@@ -22,7 +25,8 @@
     </form>
     {% endif %}
     {% if ist_admin and beleg.status in ('entwurf', 'gedruckt') %}
-    <form method="post" action="/belege/detail/{{ beleg.id }}/status/storniert">
+    <form method="post" action="/belege/detail/{{ beleg.id }}/status/storniert"
+          data-bestaetigen="{{ label }} {{ beleg.belegnr }} wirklich stornieren? Das lässt sich nicht rückgängig machen; gebuchte Lagerbewegungen werden zurückgebucht.">
       <button class="btn btn-outline-danger" type="submit">Stornieren</button>
     </form>
     {% endif %}

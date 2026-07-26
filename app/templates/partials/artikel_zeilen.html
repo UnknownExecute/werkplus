@@ -9,5 +9,22 @@
   </td>
 </tr>
 {% else %}
-<tr><td colspan="5" class="text-muted">Keine Artikel gefunden.</td></tr>
+<tr>
+  <td colspan="5" class="text-center text-muted py-4">
+    {% if gefiltert %}
+    Keine Artikel gefunden, die zur Suche passen.<br>
+    <span class="small">Suchbegriff kürzen oder anders schreiben.</span>
+    {% else %}
+    Noch keine Artikel vorhanden.<br>
+    <span class="small">Mit &bdquo;Neuer Artikel&ldquo; den ersten anlegen.</span>
+    {% endif %}
+  </td>
+</tr>
 {% endfor %}
+{% if pag and pag.seiten > 1 %}
+<tr>
+  <td colspan="5" class="bg-body-tertiary">
+    {% include "partials/pagination.html" %}
+  </td>
+</tr>
+{% endif %}

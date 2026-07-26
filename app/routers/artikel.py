@@ -8,7 +8,12 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.dependencies import get_current_user
-from app.formparse import parse_decimal
+from app.formparse import (
+    MAX_AUFSCHLAG_PROZENT,
+    parse_betrag,
+    parse_menge,
+    parse_prozent,
+)
 from app.models import (
     UST_SAETZE,
     Artikel,
@@ -18,6 +23,7 @@ from app.models import (
     Seriennummer,
     SetKomponente,
 )
+from app.pagination import Blaetterwerk, blaettere
 from app.services import artikel_set_service, berechnung
 from app.services.berechtigung import bereich_wache  # noqa: E402
 from app.templating import templates
@@ -26,8 +32,11 @@ router = APIRouter(
     prefix="/artikel", tags=["artikel"], dependencies=[Depends(bereich_wache("artikel"))]
 )
 
+SEITENGROESSE = 50
 
-def _suche_artikel(session: Session, q: str) -> list[Artikel]:
+
+def _suche_artikel(session: Session, q: str, seite: int = 1) -> tuple[list[Artikel], Blaetterwerk]:
+    """Eine Seite Artikel (Filter: Artikelnr, Bezeichnung, Warengruppe) samt Blätterwerk."""
     stmt = select(Artikel)
     if q:
         muster = f"%{q}%"
@@ -36,13 +45,32 @@ def _suche_artikel(session: Session, q: str) -> list[Artikel]:
             | Artikel.bezeichnung.ilike(muster)  # type: ignore[attr-defined]
             | Artikel.warengruppe.ilike(muster)  # type: ignore[attr-defined]
         )
-    return list(session.exec(stmt.order_by(Artikel.artikelnr)).all())
+    return blaettere(
+        session,
+        stmt.order_by(Artikel.artikelnr),
+        seite,
+        groesse=SEITENGROESSE,
+        basis_url="/artikel",
+        params={"q": q},
+        htmx_url="/artikel/suche",
+        htmx_target="#artikel-tabelle",
+    )
 
 
-def _bestaende_je_artikel(session: Session) -> dict[int, Decimal]:
-    """Summe Lagerbestand.menge je Artikel — Decimal-sicher in Python summiert."""
+def _bestaende_je_artikel(
+    session: Session, artikel_ids: list[int] | None = None
+) -> dict[int, Decimal]:
+    """Summe Lagerbestand.menge je Artikel — Decimal-sicher in Python summiert.
+
+    Mit ``artikel_ids`` werden nur die Bestände der angezeigten Seite geladen.
+    """
+    if artikel_ids is not None and not artikel_ids:
+        return {}
+    stmt = select(Lagerbestand)
+    if artikel_ids is not None:
+        stmt = stmt.where(Lagerbestand.artikel_id.in_(artikel_ids))  # type: ignore[attr-defined]
     summen: dict[int, Decimal] = {}
-    for bestand in session.exec(select(Lagerbestand)).all():
+    for bestand in session.exec(stmt).all():
         summen[bestand.artikel_id] = summen.get(bestand.artikel_id, Decimal("0")) + bestand.menge
     return summen
 
@@ -73,14 +101,17 @@ def _artikel_aus_form(
     artikel.ust_satz = ust_satz
     # Kalkulation: EK ist rein abgeleitet (Server autoritativ); VK per Kalkulation
     # vorbelegt, aber überschreibbar — ein eingegebener VK > 0 wird übernommen.
-    artikel.listenpreis_netto = parse_decimal(daten["listenpreis_netto"])
-    artikel.rabatt1_prozent = parse_decimal(daten["rabatt1_prozent"])
-    artikel.rabatt2_prozent = parse_decimal(daten["rabatt2_prozent"])
-    artikel.aufschlag_prozent = parse_decimal(daten["aufschlag_prozent"])
+    artikel.listenpreis_netto = parse_betrag(daten["listenpreis_netto"], "Listenpreis")
+    artikel.rabatt1_prozent = parse_prozent(daten["rabatt1_prozent"], "EK-Rabatt 1")
+    artikel.rabatt2_prozent = parse_prozent(daten["rabatt2_prozent"], "EK-Rabatt 2")
+    artikel.aufschlag_prozent = parse_prozent(
+        daten["aufschlag_prozent"], "Aufschlag",
+        min_wert=Decimal("-100"), max_wert=MAX_AUFSCHLAG_PROZENT,
+    )
     artikel.ek_preis = berechnung.kalkuliere_ek(
         artikel.listenpreis_netto, artikel.rabatt1_prozent, artikel.rabatt2_prozent
     )
-    eingegeben_vk = parse_decimal(daten["vk_preis"])
+    eingegeben_vk = parse_betrag(daten["vk_preis"], "Verkaufspreis")
     artikel.vk_preis = (
         eingegeben_vk
         if eingegeben_vk > 0
@@ -97,14 +128,21 @@ def _artikel_aus_form(
 def artikel_liste(
     request: Request,
     q: str = "",
+    seite: int = 1,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    artikel = _suche_artikel(session, q)
+    artikel, pag = _suche_artikel(session, q, seite)
     return templates.TemplateResponse(
         request,
         "artikel/liste.html",
-        {"artikel_liste": artikel, "bestaende": _bestaende_je_artikel(session), "q": q},
+        {
+            "artikel_liste": artikel,
+            "bestaende": _bestaende_je_artikel(session, [a.id for a in artikel]),
+            "pag": pag,
+            "gefiltert": bool(q.strip()),
+            "q": q,
+        },
     )
 
 
@@ -112,15 +150,21 @@ def artikel_liste(
 def artikel_suche(
     request: Request,
     q: str = "",
+    seite: int = 1,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """HTMX-Partial: nur die Tabellenzeilen."""
-    artikel = _suche_artikel(session, q)
+    """HTMX-Partial: nur die Tabellenzeilen (inkl. Blätter-Zeile)."""
+    artikel, pag = _suche_artikel(session, q, seite)
     return templates.TemplateResponse(
         request,
         "partials/artikel_zeilen.html",
-        {"artikel_liste": artikel, "bestaende": _bestaende_je_artikel(session)},
+        {
+            "artikel_liste": artikel,
+            "bestaende": _bestaende_je_artikel(session, [a.id for a in artikel]),
+            "pag": pag,
+            "gefiltert": bool(q.strip()),
+        },
     )
 
 
@@ -344,7 +388,7 @@ def set_komponente_hinzufuegen(
             SetKomponente(
                 set_artikel_id=artikel_id,
                 komponente_artikel_id=komponente_artikel_id,
-                menge=parse_decimal(menge),
+                menge=parse_menge(menge),
                 sort=naechster_sort,
             )
         )

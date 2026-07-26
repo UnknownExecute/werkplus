@@ -10,6 +10,7 @@
         <td class="text-end">
           <button class="btn btn-sm btn-outline-danger" type="button"
                   hx-post="/artikel/{{ artikel.id }}/set-komponenten/{{ komp.id }}/loeschen"
+                  hx-confirm="Komponente „{{ komp_artikel.artikelnr }} – {{ komp_artikel.bezeichnung }}“ wirklich aus dem Set entfernen?"
                   hx-target="#set-komponenten" hx-swap="outerHTML">Löschen</button>
         </td>
       </tr>

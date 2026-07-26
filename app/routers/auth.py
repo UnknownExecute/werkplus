@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request, status
@@ -10,6 +11,10 @@ from app.services.auth_service import authentifiziere
 from app.templating import templates
 
 router = APIRouter(tags=["auth"])
+
+# Sicherheitsrelevante Ereignisse werden protokolliert: Login-Name, Grund und
+# Zählerstand. NIEMALS das Passwort (auch nicht gekürzt oder gehasht).
+logger = logging.getLogger(__name__)
 
 # --- Brute-Force-Schutz -------------------------------------------------------
 # Einfacher In-Memory-Zähler pro Login-Name. Bewusst ohne Redis: für das MVP
@@ -70,6 +75,10 @@ def login(
     jetzt = datetime.now()
 
     if _ist_gesperrt(login_name, jetzt):
+        logger.warning(
+            "Login abgewiesen: Konto gesperrt (zu viele Fehlversuche) — login=%r",
+            login_name,
+        )
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -80,6 +89,21 @@ def login(
     benutzer = authentifiziere(session, login_name, passwort)
     if benutzer is None:
         _fehlversuch_erfassen(login_name, jetzt)
+        anzahl = len(_aktuelle_fehlversuche(login_name, jetzt))
+        logger.warning(
+            "Fehlgeschlagener Login: login=%r grund=%s versuch=%d/%d",
+            login_name,
+            "Login unbekannt, inaktiv oder Passwort falsch",
+            anzahl,
+            MAX_FEHLVERSUCHE,
+        )
+        if anzahl >= MAX_FEHLVERSUCHE:
+            logger.warning(
+                "Sperre ausgelöst: login=%r ist für %d Minuten gesperrt (%d Fehlversuche)",
+                login_name,
+                int(SPERRFENSTER.total_seconds() // 60),
+                anzahl,
+            )
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -88,6 +112,7 @@ def login(
         )
 
     _reset_rate_limit(login_name)
+    logger.info("Erfolgreicher Login: login=%r", login_name)
     profil = berechtigung.lade_profil(session, benutzer)
     request.session["benutzer_id"] = benutzer.id
     request.session["benutzer_name"] = benutzer.name

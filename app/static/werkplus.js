@@ -31,6 +31,51 @@ document.addEventListener("DOMContentLoaded", function () { injectCsrfFields(doc
 // Auch in per HTMX nachgeladene Formulare (Dialoge, Partials).
 document.body.addEventListener("htmx:afterSwap", function (e) { injectCsrfFields(e.target); });
 
+// ---- Bestätigungsdialoge für unumkehrbare Aktionen (native Formulare) ----
+// HTMX-Aktionen nutzen hx-confirm. Native <form method="post"> tragen stattdessen
+// eines dieser data-Attribute — ein zentraler Listener genügt, kein Inline-JS:
+//   data-bestaetigen="Text"      am <form> ODER am auslösenden Submit-Button
+//                                (Button gewinnt, damit ein Formular mit
+//                                 "Speichern" + "Löschen" nur beim Löschen fragt)
+//   data-bestaetigen-aus="Text"  an einer Checkbox: fragt nur, wenn sie beim
+//                                Absenden abgewählt wurde, aber serverseitig
+//                                gesetzt war (z. B. "Aktiv" → deaktivieren)
+function bestaetigungstexte(form, submitter) {
+  const texte = [];
+  const vomButton = submitter && submitter.dataset ? submitter.dataset.bestaetigen : null;
+  if (vomButton) {
+    texte.push(vomButton);
+  } else if (form.dataset && form.dataset.bestaetigen) {
+    texte.push(form.dataset.bestaetigen);
+  }
+  form.querySelectorAll("[data-bestaetigen-aus]").forEach(function (el) {
+    // defaultChecked = Zustand aus dem gelieferten HTML (also serverseitig aktiv)
+    if (el.defaultChecked && !el.checked) texte.push(el.dataset.bestaetigenAus);
+  });
+  return texte;
+}
+
+// Ein einziger Listener in der Capture-Phase. Er bricht das Absenden NUR ab,
+// wenn der Nutzer ablehnt; sonst läuft alles unverändert weiter (die
+// CSRF-Injektion hängt nicht am submit-Event, sondern an DOMContentLoaded bzw.
+// htmx:afterSwap und bleibt davon unberührt).
+document.addEventListener(
+  "submit",
+  function (e) {
+    const form = e.target;
+    if (!form || form.tagName !== "FORM") return;
+    const texte = bestaetigungstexte(form, e.submitter);
+    for (let i = 0; i < texte.length; i++) {
+      if (!window.confirm(texte[i])) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+  },
+  true
+);
+
 // Deutsches Dezimalformat ("1.234,56") robust parsen.
 function parseDe(text) {
   if (text === null || text === undefined) return 0;

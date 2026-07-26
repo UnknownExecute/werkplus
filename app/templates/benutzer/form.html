@@ -34,7 +34,9 @@
     {% if not neu %}
     <div class="col-12">
       <div class="form-check">
+        {# Rückfrage nur, wenn ein aktiver Mitarbeiter abgewählt wird (Deaktivierung). #}
         <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv" value="true"
+               data-bestaetigen-aus="Mitarbeiter „{{ benutzer.name }}“ wirklich deaktivieren? Er kann sich danach nicht mehr anmelden."
                {% if benutzer.aktiv %}checked{% endif %}{% if ist_selbst %} disabled{% endif %}>
         <label class="form-check-label" for="aktiv">Aktiv</label>
         {% if ist_selbst %}

@@ -59,6 +59,7 @@
           <button class="btn btn-sm btn-outline-danger px-1 py-0" type="button" title="Position löschen"
                   data-no-select onclick="event.stopPropagation()"
                   hx-delete="/belege/detail/{{ beleg.id }}/positionen/{{ pos.id }}"
+                  hx-confirm="Position {{ pos.pos_nr }}{% if pos.bezeichnung %} „{{ pos.bezeichnung }}“{% endif %} wirklich löschen?"
                   hx-target="#positionsbereich" hx-swap="outerHTML">&times;</button>
           {% endif %}
         </td>

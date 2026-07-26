@@ -1,3 +1,4 @@
+{% set spalten = 6 if zahlungsrelevant else 5 %}
 {% for beleg, adresse in belege %}
 <tr>
   <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
@@ -16,5 +17,22 @@
   <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
 </tr>
 {% else %}
-<tr><td colspan="{{ 6 if zahlungsrelevant else 5 }}" class="text-muted">Keine Belege gefunden.</td></tr>
+<tr>
+  <td colspan="{{ spalten }}" class="text-center text-muted py-4">
+    {% if gefiltert %}
+    Keine Belege gefunden, die zu Suche und Filter passen.<br>
+    <span class="small">Suchbegriff ändern oder den Statusfilter auf &bdquo;Alle Status&ldquo; stellen.</span>
+    {% else %}
+    Noch keine Belege dieser Art vorhanden.<br>
+    <span class="small">Mit &bdquo;Neuer Beleg&ldquo; den ersten anlegen.</span>
+    {% endif %}
+  </td>
+</tr>
 {% endfor %}
+{% if pag and pag.seiten > 1 %}
+<tr>
+  <td colspan="{{ spalten }}" class="bg-body-tertiary">
+    {% include "partials/pagination.html" %}
+  </td>
+</tr>
+{% endif %}

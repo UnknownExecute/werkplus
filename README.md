@@ -109,6 +109,20 @@ uv run pytest
   ⚠️ Bei direktem HTTP-Zugriff (`http://<NAS-IP>:9999` ohne HTTPS-Reverse-Proxy)
   scheitert dann der Login — in diesem Fall `WERKPLUS_COOKIE_SECURE=0` in die
   `.env` eintragen (besser: HTTPS im Synology-Reverse-Proxy aktivieren).
+- **Health-Check**: `GET /health` antwortet ohne Login mit
+  `{"status": "ok", "datenbank": "ok"}` (HTTP 200). Ist die Datenbank nicht
+  erreichbar (`SELECT 1` schlägt fehl), kommt HTTP 503 mit
+  `{"status": "fehler", ...}`. Die Antwort enthält bewusst keine Pfade,
+  Versionen oder Konfigurationsdetails; der Grund steht nur im Log. Die
+  `docker-compose.yml` nutzt den Endpunkt als `healthcheck`, damit Docker bzw.
+  der Synology Container Manager den Zustand kennt.
+- **Logging**: Zentral konfiguriert in `app/logging_setup.py`, Ausgabe nach
+  stdout — also `docker logs -f werkplus` bzw. Container Manager → Protokoll.
+  Level über `WERKPLUS_LOG_LEVEL` (`DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`,
+  Standard `INFO`). Protokolliert werden u. a. erfolgreiche Logins (Login-Name,
+  INFO), fehlgeschlagene Logins samt Grund und Zählerstand, ausgelöste Sperren
+  (WARNING) sowie fehlgeschlagene GitHub-Übertragungen von Bug-Meldungen.
+  Passwörter, Tokens und Secret-Keys werden nie geloggt.
 - **Bereichsrechte objektbezogen**: Verkaufs- und Einkaufsbelege sind getrennt
   geschützt; auch Suche und Dashboard zeigen nur erlaubte Bereiche.
 - **Admin-Schutz**: `ist_admin` an einer Rolle darf nur ein Admin setzen, und der

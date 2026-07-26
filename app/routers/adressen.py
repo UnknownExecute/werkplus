@@ -10,7 +10,7 @@ from sqlmodel import Session, col, select
 
 from app.database import get_session
 from app.dependencies import get_current_user
-from app.formparse import parse_decimal
+from app.formparse import parse_prozent
 from app.models import (
     Adresse,
     AdressTyp,
@@ -22,6 +22,7 @@ from app.models import (
     BelegStatus,
     Benutzer,
 )
+from app.pagination import Blaetterwerk, blaettere
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS
 from app.services.berechtigung import bereich_wache  # noqa: E402
 from app.templating import templates
@@ -30,9 +31,15 @@ router = APIRouter(
     prefix="/adressen", tags=["adressen"], dependencies=[Depends(bereich_wache("adressen"))]
 )
 
+SEITENGROESSE = 50
 
-def _suche_adressen(session: Session, q: str, typ: str) -> list[Adresse]:
-    """Suche über firma, ansprechpartner, ort (case-insensitive) + Typ-Filter."""
+TYP_FILTER = (AdressTyp.KUNDE, AdressTyp.LIEFERANT, AdressTyp.BEIDE)
+
+
+def _suche_adressen(
+    session: Session, q: str, typ: str, seite: int = 1
+) -> tuple[list[Adresse], Blaetterwerk]:
+    """Eine Seite Adressen: Suche über firma, ansprechpartner, ort + Typ-Filter."""
     stmt = select(Adresse)
     if q:
         muster = f"%{q}%"
@@ -41,9 +48,18 @@ def _suche_adressen(session: Session, q: str, typ: str) -> list[Adresse]:
             | Adresse.ansprechpartner.ilike(muster)  # type: ignore[attr-defined]
             | Adresse.ort.ilike(muster)  # type: ignore[attr-defined]
         )
-    if typ in (AdressTyp.KUNDE, AdressTyp.LIEFERANT, AdressTyp.BEIDE):
+    if typ in TYP_FILTER:
         stmt = stmt.where(Adresse.typ == typ)
-    return list(session.exec(stmt.order_by(Adresse.firma)).all())
+    return blaettere(
+        session,
+        stmt.order_by(Adresse.firma),
+        seite,
+        groesse=SEITENGROESSE,
+        basis_url="/adressen",
+        params={"q": q, "typ": typ},
+        htmx_url="/adressen/suche",
+        htmx_target="#adressen-tabelle",
+    )
 
 
 def _adresse_aus_form(  # noqa: PLR0913
@@ -76,7 +92,11 @@ def _adresse_aus_form(  # noqa: PLR0913
     adresse.telefon = telefon.strip()
     adresse.zahlungsziel_tage = zahlungsziel_tage
     adresse.rabattgruppe = rabattgruppe.strip()
-    adresse.standard_rabatt_prozent = parse_decimal(standard_rabatt_prozent)
+    # Wird als Positionsrabatt vorbelegt — ein unsinniger Wert würde sich sonst
+    # in jeden neuen Beleg fortschreiben.
+    adresse.standard_rabatt_prozent = parse_prozent(
+        standard_rabatt_prozent, "Standard-Rabatt"
+    )
     adresse.notizen = notizen.strip()
     adresse.aktiv = aktiv
     return adresse
@@ -110,12 +130,21 @@ def adressen_liste(
     request: Request,
     q: str = "",
     typ: str = "alle",
+    seite: int = 1,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    adressen = _suche_adressen(session, q, typ)
+    adressen, pag = _suche_adressen(session, q, typ, seite)
     return templates.TemplateResponse(
-        request, "adressen/liste.html", {"adressen": adressen, "q": q, "typ": typ}
+        request,
+        "adressen/liste.html",
+        {
+            "adressen": adressen,
+            "pag": pag,
+            "gefiltert": bool(q.strip()) or typ in TYP_FILTER,
+            "q": q,
+            "typ": typ,
+        },
     )
 
 
@@ -124,13 +153,20 @@ def adressen_suche(
     request: Request,
     q: str = "",
     typ: str = "alle",
+    seite: int = 1,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """HTMX-Partial: nur die Tabellenzeilen."""
-    adressen = _suche_adressen(session, q, typ)
+    """HTMX-Partial: nur die Tabellenzeilen (inkl. Blätter-Zeile)."""
+    adressen, pag = _suche_adressen(session, q, typ, seite)
     return templates.TemplateResponse(
-        request, "partials/adressen_zeilen.html", {"adressen": adressen}
+        request,
+        "partials/adressen_zeilen.html",
+        {
+            "adressen": adressen,
+            "pag": pag,
+            "gefiltert": bool(q.strip()) or typ in TYP_FILTER,
+        },
     )
 
 

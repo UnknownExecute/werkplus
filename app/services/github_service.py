@@ -6,6 +6,7 @@ die Meldung rein lokal und diese Funktionen werfen ``GitHubNichtKonfiguriert``.
 """
 
 import json
+import logging
 import urllib.error
 import urllib.request
 
@@ -13,6 +14,10 @@ from app.config import settings
 
 API_BASIS = "https://api.github.com"
 TIMEOUT_SEKUNDEN = 10
+
+# WICHTIG: In diesem Modul darf nie der GitHub-Token geloggt werden — also
+# niemals Header oder ``settings.github_token`` in eine Logzeile schreiben.
+logger = logging.getLogger(__name__)
 
 
 class GitHubNichtKonfiguriert(Exception):
@@ -61,7 +66,10 @@ def erstelle_issue(titel: str, koerper: str, labels: list[str]) -> tuple[int, st
     except urllib.error.HTTPError as fehler:
         try:
             meldung = fehler.read().decode("utf-8")
-        except Exception:
+        except Exception as lesefehler:  # noqa: BLE001 — Fallback auf die Kurzmeldung
+            logger.warning(
+                "GitHub-Fehlerantwort (HTTP %s) nicht lesbar: %s", fehler.code, lesefehler
+            )
             meldung = str(fehler)
         raise GitHubFehler(
             f"GitHub-Fehler {fehler.code}: {meldung}"

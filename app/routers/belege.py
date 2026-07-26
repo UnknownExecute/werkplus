@@ -14,7 +14,13 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.dependencies import get_current_user, require_admin
-from app.formparse import parse_decimal
+from app.formparse import (
+    MAX_AUFSCHLAG_PROZENT,
+    parse_betrag,
+    parse_decimal,
+    parse_menge,
+    parse_prozent,
+)
 from app.models import (
     UST_SAETZE,
     Adresse,
@@ -30,6 +36,7 @@ from app.models import (
     Textbaustein,
     TextbausteinKategorie,
 )
+from app.pagination import Blaetterwerk, blaettere
 from app.services import (
     artikel_set_service,
     beleg_service,
@@ -53,6 +60,8 @@ router = APIRouter(
     prefix="/belege", tags=["belege"],
     dependencies=[Depends(bereich_wache("verkauf", "einkauf"))],
 )
+
+SEITENGROESSE = 50
 
 BELEGART_LABELS: dict[Belegart, str] = {
     Belegart.ANGEBOT: "Angebot",
@@ -185,8 +194,20 @@ def _lade_position(session: Session, beleg: Beleg, position_id: int) -> BelegPos
     return position
 
 
-def _suche_belege(session: Session, art: Belegart, q: str, status_filter: str) -> list:
-    """Belege einer Belegart samt Adresse; Filter über Status + Text (Belegnr, Firma)."""
+def _beleg_filter_aktiv(q: str, status_filter: str) -> bool:
+    """Ist die Liste gerade eingeschränkt? (unterscheidet die beiden Leerzustände)"""
+    return bool(q.strip()) or status_filter in set(BelegStatus)
+
+
+def _suche_belege(
+    session: Session, art: Belegart, q: str, status_filter: str, seite: int = 1
+) -> tuple[list, Blaetterwerk]:
+    """Eine Seite Belege einer Belegart samt Adresse (Filter: Status + Text).
+
+    Liefert die Zeilen der gewünschten Seite und das Blätterwerk. Die Lieferschein-
+    Liste arbeitet ohne HTMX (klassisches GET-Formular wegen der Sammelrechnungs-
+    Checkboxen), dort blättern daher normale Links.
+    """
     stmt = (
         select(Beleg, Adresse)
         .join(Adresse, Beleg.adresse_id == Adresse.id)  # type: ignore[arg-type]
@@ -200,7 +221,18 @@ def _suche_belege(session: Session, art: Belegart, q: str, status_filter: str) -
             Beleg.belegnr.ilike(muster)  # type: ignore[attr-defined]
             | Adresse.firma.ilike(muster)  # type: ignore[attr-defined]
         )
-    return list(session.exec(stmt.order_by(Beleg.id.desc())).all())  # type: ignore[union-attr]
+    stmt = stmt.order_by(Beleg.id.desc())  # type: ignore[union-attr]
+    htmx_url = "" if art == Belegart.LIEFERSCHEIN else f"/belege/{art}/suche"
+    return blaettere(
+        session,
+        stmt,
+        seite,
+        groesse=SEITENGROESSE,
+        basis_url=f"/belege/{art}",
+        params={"q": q, "status_filter": status_filter},
+        htmx_url=htmx_url,
+        htmx_target="#beleg-tabelle",
+    )
 
 
 def _adressen_fuer_belegart(session: Session, art: Belegart) -> list[Adresse]:
@@ -521,20 +553,25 @@ def position_bearbeiten(  # noqa: PLR0913
         return _meldung(request, str(exc), status.HTTP_409_CONFLICT)
     position.bezeichnung = bezeichnung.strip()
     position.langtext = langtext.strip()
-    position.menge = parse_decimal(menge)
+    position.menge = parse_menge(menge)
     position.einheit = einheit.strip() or "Stk"
-    position.listenpreis = parse_decimal(listenpreis)
-    position.rabatt1_prozent = parse_decimal(rabatt1_prozent)
-    position.rabatt2_prozent = parse_decimal(rabatt2_prozent)
+    position.listenpreis = parse_betrag(listenpreis, "Listenpreis")
+    position.rabatt1_prozent = parse_prozent(rabatt1_prozent, "Rabatt 1")
+    position.rabatt2_prozent = parse_prozent(rabatt2_prozent, "Rabatt 2")
     position.ek_preis = berechnung.kalkuliere_ek(
         position.listenpreis, position.rabatt1_prozent, position.rabatt2_prozent
     )
-    position.aufschlag_prozent = parse_decimal(aufschlag_prozent)
+    # Aufschlag darf negativ sein (Verkauf unter EK), aber nicht unter −100 %
+    # (das wäre ein negativer Verkaufspreis aus einem positiven EK).
+    position.aufschlag_prozent = parse_prozent(
+        aufschlag_prozent, "Aufschlag", min_wert=Decimal("-100"),
+        max_wert=MAX_AUFSCHLAG_PROZENT,
+    )
     ausloeser = request.headers.get("HX-Trigger", "")
     kalk_felder = {f"{feld}-{position_id}" for feld in ("lp", "rab1", "rab2", "aufschlag")}
     if ausloeser == f"vk-{position_id}":
         # VK manuell überschrieben → übernehmen, Aufschlag rückrechnen
-        position.einzelpreis = parse_decimal(einzelpreis)
+        position.einzelpreis = parse_betrag(einzelpreis, "Verkaufspreis")
         position.aufschlag_prozent = berechnung.aufschlag_aus_vk(
             position.ek_preis, position.einzelpreis
         )
@@ -545,8 +582,8 @@ def position_bearbeiten(  # noqa: PLR0913
         )
     else:
         # Menge/Bezeichnung/… geändert → VK unverändert übernehmen (auch Freitext)
-        position.einzelpreis = parse_decimal(einzelpreis)
-    position.rabatt_prozent = parse_decimal(rabatt_prozent)
+        position.einzelpreis = parse_betrag(einzelpreis, "Verkaufspreis")
+    position.rabatt_prozent = parse_prozent(rabatt_prozent, "Positionsrabatt")
     position.ust_satz = ust_satz
     session.add(position)
     session.flush()
@@ -1209,17 +1246,18 @@ def beleg_pdf(
 
 
 @router.get("/{belegart}")
-def beleg_liste(
+def beleg_liste(  # noqa: PLR0913
     request: Request,
     belegart: str,
     q: str = "",
     status_filter: str = "alle",
+    seite: int = 1,
     fehler: str = "",
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     art = _belegart_oder_404(belegart)
-    belege = _suche_belege(session, art, q, status_filter)
+    belege, pag = _suche_belege(session, art, q, status_filter, seite)
     return templates.TemplateResponse(
         request,
         "belege/liste.html",
@@ -1228,6 +1266,8 @@ def beleg_liste(
             "label": BELEGART_LABELS[art],
             "label_plural": BELEGART_LABELS_PLURAL[art],
             "belege": belege,
+            "pag": pag,
+            "gefiltert": _beleg_filter_aktiv(q, status_filter),
             "q": q,
             "status_filter": status_filter,
             "fehler": fehler,
@@ -1247,17 +1287,20 @@ def beleg_liste_suche(
     belegart: str,
     q: str = "",
     status_filter: str = "alle",
+    seite: int = 1,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """HTMX-Partial: nur die Tabellenzeilen der Belegliste."""
+    """HTMX-Partial: nur die Tabellenzeilen der Belegliste (inkl. Blätter-Zeile)."""
     art = _belegart_oder_404(belegart)
-    belege = _suche_belege(session, art, q, status_filter)
+    belege, pag = _suche_belege(session, art, q, status_filter, seite)
     return templates.TemplateResponse(
         request,
         "partials/beleg_zeilen.html",
         {
             "belege": belege,
+            "pag": pag,
+            "gefiltert": _beleg_filter_aktiv(q, status_filter),
             "status_labels": STATUS_LABELS,
             "status_badges": STATUS_BADGES,
             "zahlungsrelevant": art in ZAHLUNGSARTEN,

@@ -5,6 +5,7 @@ immer lokal gespeichert; ist GitHub konfiguriert, wird zusätzlich ein Issue
 angelegt. Scheitert das, bleibt die Meldung lokal erhalten (Fehler wird notiert).
 """
 
+import logging
 from html import escape
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from app.services import github_service
 from app.templating import templates
 
 router = APIRouter(prefix="/bugreport", tags=["bugreport"])
+
+logger = logging.getLogger(__name__)
 
 # Screenshots landen unter app/static/bugreports/{id}.png
 SCREENSHOT_DIR = Path(__file__).resolve().parent.parent / "static" / "bugreports"
@@ -61,8 +64,18 @@ def _sende_an_github(session: Session, report: BugReport) -> BugReport:
         report.github_url = url
         report.fehler = ""
     except github_service.GitHubNichtKonfiguriert:
+        logger.info(
+            "Meldung %s nur lokal gespeichert: GitHub ist nicht konfiguriert.", report.id
+        )
         report.fehler = "GitHub ist nicht konfiguriert – nur lokal gespeichert."
     except Exception as fehler:  # noqa: BLE001 — Meldung darf lokal nie verloren gehen
+        # Verhalten bleibt unverändert (Meldung bleibt lokal erhalten), aber der
+        # Fehler ist ab jetzt im Log nachvollziehbar. Der GitHub-Token steckt nur
+        # im Request-Header, nie in der Exception — er kann hier nicht auftauchen.
+        logger.exception(
+            "GitHub-Übertragung der Meldung %s fehlgeschlagen — bleibt lokal gespeichert.",
+            report.id,
+        )
         report.fehler = str(fehler)
     session.add(report)
     session.commit()

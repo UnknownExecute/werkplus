@@ -12,5 +12,22 @@
   <td>{{ adresse.email }}</td>
 </tr>
 {% else %}
-<tr><td colspan="6" class="text-muted">Keine Adressen gefunden.</td></tr>
+<tr>
+  <td colspan="6" class="text-center text-muted py-4">
+    {% if gefiltert %}
+    Keine Adressen gefunden, die zu Suche und Typ passen.<br>
+    <span class="small">Suchbegriff ändern oder den Typ auf &bdquo;Alle Typen&ldquo; stellen.</span>
+    {% else %}
+    Noch keine Adressen vorhanden.<br>
+    <span class="small">Mit &bdquo;Neue Adresse&ldquo; die erste anlegen.</span>
+    {% endif %}
+  </td>
+</tr>
 {% endfor %}
+{% if pag and pag.seiten > 1 %}
+<tr>
+  <td colspan="6" class="bg-body-tertiary">
+    {% include "partials/pagination.html" %}
+  </td>
+</tr>
+{% endif %}

@@ -31,6 +31,9 @@ class Settings:
     secret_key: str = os.environ.get("WERKPLUS_SECRET_KEY", DEV_SECRET_DEFAULT)
     session_max_age: int = int(os.environ.get("WERKPLUS_SESSION_MAX_AGE", str(8 * 3600)))
     env: str = os.environ.get("WERKPLUS_ENV", "development")
+    # Log-Level der Anwendung (DEBUG/INFO/WARNING/ERROR/CRITICAL). Ausgabe geht
+    # nach stdout, ist also über "docker logs" sichtbar — siehe app/logging_setup.py.
+    log_level: str = os.environ.get("WERKPLUS_LOG_LEVEL", "INFO")
     # Bug-Melder → GitHub Issues (privates Repo). Token = fein granulierter PAT mit
     # Issues-Schreibrecht; repo im Format "owner/repo". Leer = nur lokal speichern.
     github_token: str = os.environ.get("WERKPLUS_GITHUB_TOKEN", "")

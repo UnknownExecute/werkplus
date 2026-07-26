@@ -57,8 +57,10 @@
       <a class="btn btn-outline-secondary" href="/benutzer/rollen">Abbrechen</a>
     </div>
     {% if not neu and not rolle.ist_standard and not in_benutzung %}
+    {# Rückfrage nur am Löschen-Button — "Speichern" im selben Formular fragt nicht. #}
     <button class="btn btn-outline-danger" type="submit"
             formaction="/benutzer/rollen/{{ rolle.id }}/loeschen"
+            data-bestaetigen="Rolle „{{ rolle.name }}“ wirklich löschen? Das lässt sich nicht rückgängig machen."
             formnovalidate>Löschen</button>
     {% endif %}
   </div>

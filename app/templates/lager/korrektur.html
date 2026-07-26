@@ -8,7 +8,9 @@
 
 {% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
 
-<form method="post" action="/lager/korrektur" class="col-lg-8">
+{# Bestandskorrektur ändert den Lagerbestand sofort und bleibt als Buchung im Journal. #}
+<form method="post" action="/lager/korrektur" class="col-lg-8"
+      data-bestaetigen="Bestandskorrektur jetzt buchen? Der Lagerbestand wird sofort geändert und die Buchung bleibt dauerhaft im Journal.">
   <div class="row g-3">
     <div class="col-md-6">
       <label class="form-label" for="artikel_id">Artikel (Lagerartikel) *</label>
