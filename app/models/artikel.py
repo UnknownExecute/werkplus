@@ -38,5 +38,9 @@ class Artikel(SQLModel, table=True):
     ust_satz: int = 20
     seriennummernpflichtig: bool = False
     ist_lagerartikel: bool = True  # False = Dienstleistung (keine Lagerführung)
+    # Meldebestand für den Bestellvorschlag (0 = keine Überwachung).
+    mindestbestand: Decimal = Field(
+        default=Decimal("0"), sa_column=Column(DecimalStr, nullable=False)
+    )
     ist_set: bool = False  # Stückliste/Set: fügt beim Einsetzen seine Komponenten ein
     aktiv: bool = True

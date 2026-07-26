@@ -24,6 +24,26 @@ def render_item(type_, obj, autogen_context):
     return False
 
 
+def include_object(objekt, name, typ, reflektiert, vergleich_zu):
+    """Blendet den selbstreferenzierenden FK ``beleg.auftrag_id → beleg.id`` aus.
+
+    Grund: SQLite kann Self-FKs im Batch-Modus (Tabelle kopieren + umbenennen)
+    nicht sauber neu anlegen — die erzeugte Migration scheitert. Die Spalte samt
+    Index genügt fachlich; SQLite erzwingt FKs ohnehin nur mit aktivem PRAGMA
+    (das die App setzt, siehe app/database.py).
+
+    Ohne diesen Filter schrieb ``alembic revision --autogenerate`` bei JEDER
+    neuen Migration wieder eine ``create_foreign_key``-Zeile hinein, die man
+    manuell löschen musste. Der Filter erledigt das nun dauerhaft und macht
+    zugleich ``alembic check`` (Drift-Prüfung) benutzbar.
+    """
+    if typ == "foreign_key_constraint" and getattr(objekt, "table", None) is not None:
+        spalten = [s.name for s in objekt.columns]
+        if objekt.table.name == "beleg" and spalten == ["auftrag_id"]:
+            return False
+    return True
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -33,6 +53,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         render_as_batch=True,
         render_item=render_item,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -52,6 +73,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             render_as_batch=True,  # SQLite: ALTER TABLE nur über Batch-Mode
             render_item=render_item,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

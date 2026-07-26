@@ -35,6 +35,7 @@ from app.models import (
     Seriennummer,
     Textbaustein,
     TextbausteinKategorie,
+    Zugriff,
 )
 from app.pagination import Blaetterwerk, blaettere
 from app.services import (
@@ -44,9 +45,14 @@ from app.services import (
     lager_service,
     seriennummer_service,
 )
-from app.services.berechtigung import bereich_wache, darf_bereich  # noqa: E402
+from app.services.berechtigung import (  # noqa: E402
+    bereich_wache,
+    darf,
+    lade_profil,
+)
 from app.services.fehler import (
     BelegGesperrt,
+    LagerbuchungFehlgeschlagen,
     SnNichtVerfuegbar,
     SnPflichtVerletzt,
     StornoNichtMoeglich,
@@ -160,19 +166,44 @@ def _bereich_fuer(belegart: Belegart) -> str:
     return "verkauf" if belegart in VERKAUFSARTEN else "einkauf"
 
 
-def _pruefe_belegart_recht(request: Request, belegart: Belegart) -> None:
+def _pruefe_belegart_recht(request: Request, session: Session, belegart: Belegart) -> None:
     """Erzwingt das Recht am konkreten Bereich der Belegart.
 
     Die Router-Wache prüft nur "verkauf ODER einkauf". Ohne diese objektbezogene
     Prüfung könnte ein Nutzer mit ausschließlich Verkaufsrecht Einkaufsbelege
     lesen/ändern (und umgekehrt).
+
+    Die Rechte werden bewusst **frisch aus der Datenbank** gelesen (wie in
+    ``bereich_wache``) und nicht aus der Session: Eine Durchsetzungsprüfung darf
+    einem Rechteentzug nicht bis zum nächsten Login nachhinken. Die Session-
+    Variante (``darf_bereich``) bleibt der Template-Anzeige vorbehalten.
     """
-    mindestens = "bearbeiten" if request.method in {"POST", "PUT", "PATCH", "DELETE"} else "ansehen"
-    if not darf_bereich(request, _bereich_fuer(belegart), mindestens):
+    bereich = _bereich_fuer(belegart)
+    mindestens = (
+        Zugriff.BEARBEITEN
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        else Zugriff.ANSEHEN
+    )
+    benutzer_id = request.session.get("benutzer_id")
+    benutzer = session.get(Benutzer, benutzer_id) if benutzer_id else None
+    if benutzer is None or not darf(lade_profil(session, benutzer), bereich, mindestens):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Keine Berechtigung für: {_bereich_fuer(belegart)}.",
+            detail=f"Keine Berechtigung für: {bereich}.",
         )
+
+
+def _belegart_mit_recht(belegart: str, request: Request, session: Session) -> Belegart:
+    """Belegart aus dem Pfad prüfen UND das zugehörige Bereichsrecht erzwingen.
+
+    Für die generischen ``/{belegart}``-Routen (Liste, Suche, Neuanlage): dort
+    steht die Belegart im Pfad, also muss der Bereich daraus abgeleitet geprüft
+    werden — sonst könnte man mit reinem Verkaufsrecht Einkaufsbelege auflisten
+    oder anlegen.
+    """
+    art = _belegart_oder_404(belegart)
+    _pruefe_belegart_recht(request, session, art)
+    return art
 
 
 def _lade_beleg(session: Session, beleg_id: int, request: Request | None = None) -> Beleg:
@@ -181,7 +212,7 @@ def _lade_beleg(session: Session, beleg_id: int, request: Request | None = None)
     if beleg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Beleg nicht gefunden")
     if request is not None:
-        _pruefe_belegart_recht(request, beleg.belegart)
+        _pruefe_belegart_recht(request, session, beleg.belegart)
     return beleg
 
 
@@ -941,6 +972,9 @@ def _statuswechsel(
         BelegGesperrt,
         SnPflichtVerletzt,
         StornoNichtMoeglich,
+        # Lagerbuchung konnte wegen Nebenläufigkeit nicht durchgeführt werden —
+        # gehört fachlich gemeldet (erneut versuchen), nicht als 500.
+        LagerbuchungFehlgeschlagen,
     ) as exc:
         # Hooks können teilgebucht haben — alles zurückrollen, bevor umgeleitet wird
         session.rollback()
@@ -1256,7 +1290,7 @@ def beleg_liste(  # noqa: PLR0913
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    art = _belegart_oder_404(belegart)
+    art = _belegart_mit_recht(belegart, request, session)
     belege, pag = _suche_belege(session, art, q, status_filter, seite)
     return templates.TemplateResponse(
         request,
@@ -1292,7 +1326,7 @@ def beleg_liste_suche(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: nur die Tabellenzeilen der Belegliste (inkl. Blätter-Zeile)."""
-    art = _belegart_oder_404(belegart)
+    art = _belegart_mit_recht(belegart, request, session)
     belege, pag = _suche_belege(session, art, q, status_filter, seite)
     return templates.TemplateResponse(
         request,
@@ -1318,7 +1352,7 @@ def beleg_neu_form(
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    art = _belegart_oder_404(belegart)
+    art = _belegart_mit_recht(belegart, request, session)
     return templates.TemplateResponse(
         request,
         "belege/neu.html",
@@ -1341,7 +1375,7 @@ def beleg_neu(
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    art = _belegart_oder_404(belegart)
+    art = _belegart_mit_recht(belegart, request, session)
     adresse = session.get(Adresse, adresse_id)
     if adresse is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adresse nicht gefunden")

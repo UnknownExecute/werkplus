@@ -13,6 +13,12 @@ Fachliche Regeln:
 Die Hooks validieren zuerst vollständig und buchen erst danach — schlägt die
 Validierung fehl, bleibt nur der (ungecommittete) Statuswechsel aus setze_status
 in der Session; der Aufrufer muss bei einer Hook-Exception rollbacken.
+
+Nebenläufigkeit: ``lager_service.buche`` schreibt den Bestand optimistisch gesperrt
+mit Retry fort und wirft nach erschöpften Versuchen ``LagerbuchungFehlgeschlagen``
+(Unterklasse von ``WerkplusFehler``). Die Hooks fangen das absichtlich NICHT ab —
+teilgebuchte Belege dürfen nicht bestehen bleiben. Der Aufrufer (siehe
+``_statuswechsel`` in app/routers/belege.py) rollt zurück und meldet fachlich.
 """
 
 from decimal import Decimal

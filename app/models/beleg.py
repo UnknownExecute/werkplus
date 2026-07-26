@@ -62,6 +62,15 @@ class Beleg(SQLModel, table=True):
     # Abschlags- und Schlussrechnungen mit ihrem Ur-Auftrag (für den Abschlagsabzug).
     ist_abschlag: bool = Field(default=False, index=True)
     auftrag_id: int | None = Field(default=None, foreign_key="beleg.id", index=True)
+    # Skonto: Abzug in Prozent, wenn innerhalb skonto_tage ab Belegdatum gezahlt
+    # wird (0 % = kein Skonto). Wird aus der Adresse vorbelegt.
+    skonto_prozent: Decimal = Field(
+        default=Decimal("0"), sa_column=Column(DecimalStr, nullable=False)
+    )
+    skonto_tage: int = 0
+    # Mahnwesen: 0 = nicht gemahnt, 1..n = Mahnstufe (Zahlungserinnerung, 1., 2. Mahnung)
+    mahnstufe: int = Field(default=0, index=True)
+    letzte_mahnung_am: date | None = None
 
 
 class BelegPosition(SQLModel, table=True):

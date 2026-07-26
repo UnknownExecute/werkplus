@@ -32,6 +32,12 @@ class Adresse(SQLModel, table=True):
     standard_rabatt_prozent: Decimal = Field(
         default=Decimal("0"), sa_column=Column(DecimalStr, nullable=False)
     )
+    # Skonto-Vereinbarung mit diesem Kunden (0 % = kein Skonto); wird in neue
+    # Belege vorbelegt.
+    skonto_prozent: Decimal = Field(
+        default=Decimal("0"), sa_column=Column(DecimalStr, nullable=False)
+    )
+    skonto_tage: int = 0
     notizen: str = ""
     aktiv: bool = True
 

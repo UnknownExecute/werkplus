@@ -53,6 +53,7 @@ def test_ungueltige_belegart(session):
         naechste_belegnr(session, "kassabon", jahr=2026)  # type: ignore[arg-type]
 
 
+@pytest.mark.slow
 def test_race_acht_threads_lueckenlos(tmp_path):
     """8 Threads ziehen je 25 Nummern parallel — alle 200 eindeutig und lückenlos."""
     engine = create_engine(

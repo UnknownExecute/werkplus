@@ -53,6 +53,7 @@ def _positionen(session, beleg: Beleg) -> list[BelegPosition]:
     )
 
 
+@pytest.mark.integration
 def test_kompletter_durchlauf(session):
     jahr = date.today().year
 

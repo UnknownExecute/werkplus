@@ -1,6 +1,10 @@
+from decimal import Decimal
 from enum import StrEnum
 
+from sqlalchemy import Column
 from sqlmodel import Field, SQLModel
+
+from app.models.types import DecimalStr
 
 
 class Rolle(StrEnum):
@@ -20,3 +24,7 @@ class Benutzer(SQLModel, table=True):
     # Rollenname; verweist auf Rollenprofil.name (StrEnum-Werte bleiben gültig)
     rolle: str = Rolle.SACHBEARBEITER
     aktiv: bool = True
+    # Verrechnungssatz für die Arbeitszeiterfassung (Vorbelegung je Zeile).
+    stundensatz: Decimal = Field(
+        default=Decimal("0"), sa_column=Column(DecimalStr, nullable=False)
+    )

@@ -26,6 +26,8 @@ from app.models.rollenprofil import (
 from app.models.seriennummer import Seriennummer, SnStatus
 from app.models.setkomponente import SetKomponente
 from app.models.textbaustein import Textbaustein, TextbausteinKategorie
+from app.models.zahlung import Zahlung, Zahlungsart
+from app.models.zeiterfassung import Zeiterfassung
 
 __all__ = [
     "UST_SAETZE",
@@ -61,4 +63,7 @@ __all__ = [
     "SnStatus",
     "Textbaustein",
     "TextbausteinKategorie",
+    "Zahlung",
+    "Zahlungsart",
+    "Zeiterfassung",
 ]

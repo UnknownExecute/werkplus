@@ -35,7 +35,13 @@ ignore = ["B008"]  # FastAPI Depends() in Default-Argumenten ist idiomatisch
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Bewusst KEIN "-m"-Filter: `pytest` ohne Argumente laeuft weiterhin komplett.
+# Schneller Inner-Loop: `pytest -m "not slow"` bzw. `-m "not slow and not integration"`.
 addopts = "-q"
+markers = [
+    "slow: laufzeitintensiv (z. B. dateibasiertes SQLite, Nebenlaeufigkeit mit Threads)",
+    "integration: greift ueber mehrere Schichten/Services (grosse Durchlauf-Tests)",
+]
 
 [tool.uv]
 package = false

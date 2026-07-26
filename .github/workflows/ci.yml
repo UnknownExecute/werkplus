@@ -1,0 +1,88 @@
+name: CI
+
+# Laeuft bei jedem Push auf main und bei jedem Pull Request.
+# Ziel: keine Regression erreicht main (und damit die produktive NAS) unbemerkt.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Aeltere Laeufe desselben Branches abbrechen (privates Repo = begrenzte Minuten)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint & Tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: WeasyPrint-Systemabhaengigkeiten installieren
+        # Ohne Pango/Cairo/gdk-pixbuf ist WeasyPrint nicht importierbar und der
+        # PDF-Byte-Test wuerde stillschweigend geskippt (siehe tests/test_pdf.py).
+        # Paketliste sinngemaess aus dem Dockerfile (Debian-slim) uebernommen.
+        # gdk-pixbuf heisst je Ubuntu-Version anders (libgdk-pixbuf-2.0-0 ab
+        # 24.04, davor libgdk-pixbuf2.0-0). Daher zuerst die stabilen Pakete,
+        # dann die passende Variante ermitteln — sonst scheitert der Lauf nur
+        # am Paketnamen.
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            libpangoft2-1.0-0 \
+            libcairo2 \
+            libffi-dev \
+            shared-mime-info \
+            fonts-dejavu-core
+          if apt-cache show libgdk-pixbuf-2.0-0 >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends libgdk-pixbuf-2.0-0
+          else
+            sudo apt-get install -y --no-install-recommends libgdk-pixbuf2.0-0
+          fi
+
+      - name: uv einrichten
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Python 3.12 bereitstellen
+        run: uv python install 3.12
+
+      - name: Abhaengigkeiten installieren (inkl. dev)
+        run: uv sync --dev
+
+      - name: WeasyPrint-Verfuegbarkeit pruefen
+        # Bricht den Lauf ab, falls die Systempakete nicht genuegen. Sonst wuerden
+        # die PDF-Tests nur geskippt und die CI waere truegerisch gruen.
+        run: uv run python -c "import weasyprint; print('WeasyPrint', weasyprint.__version__, 'lauffaehig')"
+
+      - name: Ruff (Lint)
+        run: uv run ruff check .
+
+      - name: Tests (alle)
+        run: uv run pytest
+
+      - name: PDF-Tests explizit (duerfen NICHT geskippt werden)
+        # Eigener Schritt, damit im Log sichtbar ist, dass der PDF-Byte-Test
+        # tatsaechlich laeuft. -r a zeigt eine etwaige Skip-Begruendung an;
+        # ein Skip laesst den Schritt bewusst fehlschlagen (sonst waere die CI
+        # truegerisch gruen, obwohl der PDF-Pfad nie geprueft wurde).
+        shell: bash
+        run: |
+          uv run pytest tests/test_pdf.py -v -r a --no-header | tee pdf-tests.log
+          if grep -q "SKIPPED" pdf-tests.log; then
+            echo "::error::PDF-Tests wurden uebersprungen - WeasyPrint-Systemabhaengigkeiten pruefen"
+            exit 1
+          fi

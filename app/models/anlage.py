@@ -16,6 +16,11 @@ class Anlage(SQLModel, table=True):
     inbetriebnahme: date | None = None
     garantieende: date | None = None
     naechste_wartung: date | None = Field(default=None, index=True)
+    # Wartungsvertrag: Intervall in Monaten (0 = kein Vertrag/kein Intervall).
+    # Ist ein Intervall gesetzt, schreibt der Serviceeinsatz die nächste Wartung
+    # automatisch fort — bisher musste das Datum manuell gepflegt werden.
+    wartungsintervall_monate: int = 0
+    vertrag_bis: date | None = None
     notizen: str = ""
     aktiv: bool = True
 

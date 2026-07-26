@@ -14,6 +14,7 @@ from app.formparse import parse_decimal
 from app.models import Artikel, Beleg, Benutzer, Buchungsart, Lager, Lagerbewegung
 from app.services import lager_service
 from app.services.berechtigung import bereich_wache  # noqa: E402
+from app.services.fehler import LagerbuchungFehlgeschlagen
 from app.templating import templates
 
 router = APIRouter(
@@ -148,14 +149,22 @@ def korrektur_buchen(  # noqa: PLR0913
     else:
         buchungsmenge = eingabe
     if buchungsmenge != 0:
-        lager_service.buche(
-            session,
-            artikel_id=aid,
-            lager_id=lid,
-            menge=buchungsmenge,
-            buchungsart=Buchungsart.KORREKTUR,
-            benutzer_id=benutzer.id,
-            notiz=grund.strip(),
-        )
+        try:
+            lager_service.buche(
+                session,
+                artikel_id=aid,
+                lager_id=lid,
+                menge=buchungsmenge,
+                buchungsart=Buchungsart.KORREKTUR,
+                benutzer_id=benutzer.id,
+                notiz=grund.strip(),
+            )
+        except LagerbuchungFehlgeschlagen as exc:
+            # Nebenläufigkeitskonflikt: nichts halb gebucht stehen lassen und das
+            # Formular mit sprechendem Hinweis erneut zeigen (kein 500).
+            session.rollback()
+            return templates.TemplateResponse(
+                request, "lager/korrektur.html", _korrektur_kontext(session, fehler=str(exc))
+            )
         session.commit()
     return RedirectResponse("/lager/bewegungen", status_code=status.HTTP_302_FOUND)

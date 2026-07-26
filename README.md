@@ -92,6 +92,70 @@ uv run pytest
 - `app/templates/` — Jinja2 (+ `templates/pdf/` für Belegdruck)
 - `alembic/` — Migrationen (`uv run alembic revision --autogenerate -m "..."`)
 
+### Continuous Integration
+
+`.github/workflows/ci.yml` läuft bei **jedem Push auf `main` und bei jedem Pull
+Request** (ubuntu-latest, Python 3.12) und prüft:
+
+1. `uv sync --dev` — Abhängigkeiten inkl. Dev-Gruppe
+2. `uv run ruff check .` — Lint
+3. `uv run pytest` — die komplette Testsuite
+4. `uv run pytest tests/test_pdf.py` als eigener Schritt
+
+Damit die PDF-Tests nicht stillschweigend übersprungen werden, installiert die CI
+vorher die WeasyPrint-Systempakete (Pango/Cairo/gdk-pixbuf, Paketliste sinngemäß
+aus dem `Dockerfile`), verifiziert den `import weasyprint` und lässt Schritt 4
+**fehlschlagen, wenn ein Test als `SKIPPED` im Log auftaucht** — eine grüne CI
+ohne echten PDF-Byte-Test wäre trügerisch. Lokal auf Windows ohne GTK bleibt der
+PDF-Byte-Test wie bisher geskippt; das ist erwartet.
+
+### Schneller Inner-Loop
+
+Langsame Tests sind mit pytest-Markern versehen (in `pyproject.toml`
+registriert), damit man sie beim Entwickeln überspringen kann:
+
+```bash
+uv run pytest -m "not slow"                     # ohne laufzeitintensive Tests
+uv run pytest -m "not slow and not integration" # schnellster Durchlauf
+uv run pytest                                   # unverändert ALLE Tests (auch in CI)
+```
+
+- `slow` — `tests/test_nummernkreis.py::test_race_acht_threads_lueckenlos`
+  (dateibasiertes SQLite, 8 Threads). Weitere Nebenläufigkeits-/Race-Tests
+  gehören hier ebenfalls hin (z. B. `tests/test_lager_nebenlaeufig.py`).
+- `integration` — `tests/test_e2e_durchlauf.py` (großer Durchlauf über alle
+  Schichten)
+
+Ohne `-m` ändert sich nichts: `uv run pytest` führt weiterhin die vollständige
+Suite aus, und genau das macht auch die CI.
+
+Optionale nächste Schritte (bewusst noch nicht eingerichtet, weil sie den
+Bestand umformatieren bzw. lokale Hooks brauchen): `ruff format` samt
+`ruff format --check` in der CI und ein pre-commit-Hook für Lint/Format.
+
+### Migrationen beim Deploy
+
+**Migrationen laufen beim Containerstart automatisch.** `docker-entrypoint.sh`
+führt vor dem Serverstart `uv run alembic upgrade head` aus (idempotent), danach
+`scripts.init_prod`. Beim Ausrollen auf die NAS (`./update.sh`) ist also **kein
+manueller Migrationsschritt nötig** — es genügt, dass die neue Revision im Repo
+liegt. Konsequenzen fürs Entwickeln:
+
+- Jede Modelländerung braucht eine mitcommittete Alembic-Revision, sonst
+  divergiert das Schema auf der NAS von den Models.
+- Vor dem Ausrollen ein Backup von `./data/werkplus.db` haben — ein
+  fehlgeschlagenes `upgrade head` bricht den Containerstart ab.
+
+> **Warnung — Self-Foreign-Key bei `alembic revision --autogenerate`:**
+> Autogenerate erzeugt für den selbst-referenzierenden Fremdschlüssel
+> `beleg.auftrag_id → beleg.id` immer wieder `create_foreign_key`-Zeilen (bzw.
+> `batch_op.create_foreign_key(...)`). Diese **scheitern im SQLite-Batch-Modus**
+> und müssen aus der neu generierten Migration **gelöscht** werden — Spalte und
+> Index genügen (SQLite erzwingt Fremdschlüssel ohnehin nur mit aktivem
+> `PRAGMA foreign_keys`). So ist es bereits in den Revisionen `a9197f1b1379` und
+> `4d89de911e3f` gemacht; dort findet sich auch ein erklärender Kommentar.
+> Also: jede autogenerierte Migration vor dem Commit durchlesen.
+
 ## Betrieb & Sicherheit
 
 - **Produktionsstart**: `WERKPLUS_ENV=production` setzen. Dann verweigert die App den
@@ -137,6 +201,19 @@ uv run pytest
 
   Als Cron-/Task-Job täglich ausführen und die Backups extern sichern. Restore =
   gesicherte Datei zurückkopieren (App gestoppt).
+
+**Brute-Force-Schutz: Limit je Login-Name und je IP.** Fehlversuche werden in
+einem 5-Minuten-Fenster doppelt gezählt: 5 pro Login-Name und 20 pro Client-IP
+(höher, weil hinter einer NAT-IP mehrere Mitarbeiter sitzen). Das IP-Limit
+bremst „Password Spraying“, bei dem ein Passwort gegen viele Login-Namen
+probiert wird. Die Zähler liegen im Prozessspeicher, sind auf 1000 verfolgte
+Schlüssel begrenzt und gelten je uvicorn-Worker — WerkPlus daher mit **einem**
+Worker betreiben (der Docker-Entrypoint startet genau einen). Hinter dem
+Synology-Reverse-Proxy steht die echte IP in `X-Forwarded-For`; dieser Header
+wird nur mit `WERKPLUS_TRUST_PROXY=1` ausgewertet (sonst gilt die direkte
+Verbindungsadresse). ⚠️ `WERKPLUS_TRUST_PROXY=1` nur setzen, wenn WerkPlus
+ausschließlich über den Reverse-Proxy erreichbar ist — ist der Port sonst direkt
+erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
 
 ## Fachliche Eckpunkte
 

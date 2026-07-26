@@ -27,3 +27,13 @@ class SnNichtVerfuegbar(WerkplusFehler):
 
 class StornoNichtMoeglich(WerkplusFehler):
     """Der Storno ist fachlich nicht möglich (z. B. Seriennummern bereits verkauft)."""
+
+
+class LagerbuchungFehlgeschlagen(WerkplusFehler):
+    """Bestandsfortschreibung war auch nach mehreren Versuchen nicht möglich.
+
+    Tritt auf, wenn die Datenbank dauerhaft durch parallele Schreiber belegt ist
+    ("database is locked" / SQLITE_BUSY_SNAPSHOT) oder der optimistische
+    Compare-and-Swap wiederholt verloren geht. Der Aufrufer soll zurückrollen und
+    zum erneuten Versuch auffordern — kein Serverfehler.
+    """

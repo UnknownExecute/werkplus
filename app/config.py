@@ -49,6 +49,12 @@ class Settings:
         "WERKPLUS_COOKIE_SECURE",
         "1" if os.environ.get("WERKPLUS_ENV", "development") == "production" else "0",
     ) != "0"
+    # Vertrauen in Proxy-Header (X-Forwarded-For) für die Client-IP-Ermittlung.
+    # Standard: AUS. Nur einschalten (WERKPLUS_TRUST_PROXY=1), wenn WerkPlus
+    # AUSSCHLIESSLICH über den Reverse-Proxy erreichbar ist — der Header ist vom
+    # Client frei setzbar, sonst könnte ein Angreifer das IP-Limit des
+    # Brute-Force-Schutzes mit erfundenen IPs umgehen (Spoofing).
+    trust_proxy: bool = os.environ.get("WERKPLUS_TRUST_PROXY", "0") == "1"
     firma: Firmendaten = field(default_factory=Firmendaten)
 
 
