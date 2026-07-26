@@ -4,9 +4,23 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 import app.models  # noqa: F401 — Metadata vollständig registrieren
+from app.config import settings
 from app.database import get_session
 from app.main import app as fastapi_app
 from app.services import beleg_service
+
+
+@pytest.fixture(autouse=True)
+def _csrf_aus():
+    """CSRF-Schutz in der Testsuite abschalten.
+
+    Die Bestandstests posten ohne Token; der Schutz selbst wird gezielt in
+    ``tests/test_csrf.py`` geprüft (dort wieder eingeschaltet).
+    """
+    vorher = settings.csrf_aktiv
+    settings.csrf_aktiv = False
+    yield
+    settings.csrf_aktiv = vorher
 
 
 @pytest.fixture(autouse=True)

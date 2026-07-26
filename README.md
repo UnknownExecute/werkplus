@@ -99,6 +99,20 @@ uv run pytest
   einen sicheren Schlüssel erzeugen, z. B. `python -c "import secrets; print(secrets.token_hex(32))"`.
 - **Brute-Force-Schutz**: Nach mehreren Fehlversuchen wird der betroffene Login
   kurzzeitig gesperrt (In-Memory, pro Prozess).
+- **CSRF-Schutz**: Schreibende Anfragen (POST/PUT/DELETE) brauchen einen
+  Sitzungs-Token — als Formularfeld `csrf_token` oder Header `X-CSRF-Token`.
+  Beides fügt `app/static/werkplus.js` automatisch ein; im Code ist nichts zu
+  beachten. Notfalls abschaltbar mit `WERKPLUS_CSRF=0`.
+- **Sicherheits-Header**: CSP, `X-Frame-Options: DENY`, `nosniff` und
+  `Referrer-Policy` werden auf jede Antwort gesetzt (`app/security.py`).
+- **Session-Cookie**: In Produktion wird es nur über HTTPS gesendet.
+  ⚠️ Bei direktem HTTP-Zugriff (`http://<NAS-IP>:9999` ohne HTTPS-Reverse-Proxy)
+  scheitert dann der Login — in diesem Fall `WERKPLUS_COOKIE_SECURE=0` in die
+  `.env` eintragen (besser: HTTPS im Synology-Reverse-Proxy aktivieren).
+- **Bereichsrechte objektbezogen**: Verkaufs- und Einkaufsbelege sind getrennt
+  geschützt; auch Suche und Dashboard zeigen nur erlaubte Bereiche.
+- **Admin-Schutz**: `ist_admin` an einer Rolle darf nur ein Admin setzen, und der
+  letzte aktive Admin kann nicht deaktiviert/herabgestuft werden.
 - **Backup**: Die gesamte Anwendungsdatenbank ist die SQLite-Datei (Standard
   `werkplus.db`, im Docker-Volume `/data/werkplus.db`). Für ein konsistentes Backup
   im laufenden Betrieb (WAL-Mode) den SQLite-eigenen Befehl nutzen statt roh zu kopieren:

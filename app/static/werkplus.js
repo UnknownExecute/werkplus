@@ -1,5 +1,36 @@
 // WerkPlus – clientseitige Helfer (Kalkulation + mehrzeilige Positionsbeschreibung)
 
+// ---- CSRF-Schutz: Token aus <meta> in jede schreibende Anfrage einspeisen ----
+function csrfToken() {
+  const el = document.querySelector('meta[name="csrf-token"]');
+  return el ? el.getAttribute("content") : "";
+}
+
+// HTMX-Requests: Token als Header X-CSRF-Token mitsenden.
+document.body.addEventListener("htmx:configRequest", function (e) {
+  const t = csrfToken();
+  if (t) e.detail.headers["X-CSRF-Token"] = t;
+});
+
+// Native <form method="post">: verstecktes Feld csrf_token injizieren (falls fehlt).
+function injectCsrfFields(root) {
+  const t = csrfToken();
+  if (!t) return;
+  (root || document).querySelectorAll("form").forEach(function (f) {
+    const m = (f.getAttribute("method") || "get").toLowerCase();
+    if (m !== "post") return;
+    if (f.querySelector('input[name="csrf_token"]')) return;
+    const i = document.createElement("input");
+    i.type = "hidden";
+    i.name = "csrf_token";
+    i.value = t;
+    f.appendChild(i);
+  });
+}
+document.addEventListener("DOMContentLoaded", function () { injectCsrfFields(document); });
+// Auch in per HTMX nachgeladene Formulare (Dialoge, Partials).
+document.body.addEventListener("htmx:afterSwap", function (e) { injectCsrfFields(e.target); });
+
 // Deutsches Dezimalformat ("1.234,56") robust parsen.
 function parseDe(text) {
   if (text === null || text === undefined) return 0;

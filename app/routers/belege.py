@@ -37,7 +37,7 @@ from app.services import (
     lager_service,
     seriennummer_service,
 )
-from app.services.berechtigung import bereich_wache  # noqa: E402
+from app.services.berechtigung import bereich_wache, darf_bereich  # noqa: E402
 from app.services.fehler import (
     BelegGesperrt,
     SnNichtVerfuegbar,
@@ -146,10 +146,33 @@ def _belegart_oder_404(belegart: str) -> Belegart:
         ) from None
 
 
-def _lade_beleg(session: Session, beleg_id: int) -> Beleg:
+def _bereich_fuer(belegart: Belegart) -> str:
+    """Zuständiger Rechtebereich einer Belegart ("verkauf" oder "einkauf")."""
+    return "verkauf" if belegart in VERKAUFSARTEN else "einkauf"
+
+
+def _pruefe_belegart_recht(request: Request, belegart: Belegart) -> None:
+    """Erzwingt das Recht am konkreten Bereich der Belegart.
+
+    Die Router-Wache prüft nur "verkauf ODER einkauf". Ohne diese objektbezogene
+    Prüfung könnte ein Nutzer mit ausschließlich Verkaufsrecht Einkaufsbelege
+    lesen/ändern (und umgekehrt).
+    """
+    mindestens = "bearbeiten" if request.method in {"POST", "PUT", "PATCH", "DELETE"} else "ansehen"
+    if not darf_bereich(request, _bereich_fuer(belegart), mindestens):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Keine Berechtigung für: {_bereich_fuer(belegart)}.",
+        )
+
+
+def _lade_beleg(session: Session, beleg_id: int, request: Request | None = None) -> Beleg:
+    """Beleg laden; mit ``request`` zusätzlich das Verkauf/Einkauf-Recht prüfen."""
     beleg = session.get(Beleg, beleg_id)
     if beleg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Beleg nicht gefunden")
+    if request is not None:
+        _pruefe_belegart_recht(request, beleg.belegart)
     return beleg
 
 
@@ -359,7 +382,7 @@ def beleg_editor(
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     adresse = session.get(Adresse, beleg.adresse_id)
     kontext = _grid_kontext(session, beleg)
     # M5-Vorbereitung: nach dem Buchen eines Lieferscheins mit SN-Positionen
@@ -405,7 +428,7 @@ def beleg_artikelsuche(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: Trefferliste der Artikel-Schnellsuche im Editor."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     treffer: list[Artikel] = []
     if q.strip():
         muster = f"%{q.strip()}%"
@@ -434,7 +457,7 @@ def position_hinzufuegen(
     session: Session = Depends(get_session),
 ):
     """Fügt eine Artikelposition (Menge 1) oder eine freie Position hinzu; liefert das Grid."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     artikel = None
     if artikel_id is not None:
         artikel = session.get(Artikel, artikel_id)
@@ -485,7 +508,7 @@ def position_bearbeiten(  # noqa: PLR0913
     das VK-Feld selbst geändert (erkannt am HX-Trigger ``vk-<id>``), dann wird
     der eingegebene VK übernommen und der Aufschlag daraus rückgerechnet.
     """
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     if ust_satz not in UST_SAETZE:
         raise HTTPException(
@@ -540,7 +563,7 @@ def position_loeschen(
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     try:
         beleg_service.entferne_position(session, beleg, position)
@@ -560,7 +583,7 @@ def position_verschieben(
     session: Session = Depends(get_session),
 ):
     """Verschiebt eine Position hoch/runter (tauscht pos_nr) und liefert das Grid."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     try:
         beleg_service.verschiebe_position(session, beleg, position, richtung)
@@ -582,7 +605,7 @@ def position_detail(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: Detail-/Kalkulationspanel der aktiven Position."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     return templates.TemplateResponse(
         request, "partials/position_detail.html", _detail_kontext(session, beleg, position)
@@ -601,7 +624,7 @@ def position_textbausteine(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: aktive Positions-Textbausteine zur Auswahl."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     return templates.TemplateResponse(
         request,
@@ -629,7 +652,7 @@ def position_textbaustein_einfuegen(
     session: Session = Depends(get_session),
 ):
     """Hängt den Textbaustein-Text an den Langtext der Position an; liefert Grid + Panel."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position = _lade_position(session, beleg, position_id)
     try:
         beleg_service.pruefe_bearbeitbar(beleg)
@@ -652,7 +675,7 @@ def kopf_textbausteine(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: Kopf-/Fuß-Textbausteine zur Auswahl."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     kategorie = (
         TextbausteinKategorie.FUSS if ziel == "fuss" else TextbausteinKategorie.KOPF
     )
@@ -671,6 +694,7 @@ def kopf_textbausteine(
 
 @router.post("/detail/{beleg_id}/textbaustein-kopf-einfuegen")
 def kopf_textbaustein_einfuegen(
+    request: Request,
     beleg_id: int,
     baustein_id: int = Form(...),
     ziel: str = Form("kopf"),
@@ -678,7 +702,7 @@ def kopf_textbaustein_einfuegen(
     session: Session = Depends(get_session),
 ):
     """Hängt den Textbaustein-Text an Kopf- bzw. Fußtext an; leitet zum Editor zurück."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     try:
         beleg_service.pruefe_bearbeitbar(beleg)
     except BelegGesperrt as exc:
@@ -699,12 +723,13 @@ def kopf_textbaustein_einfuegen(
 
 @router.post("/detail/{beleg_id}/duplizieren")
 def beleg_duplizieren(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Dupliziert den Beleg als frischen Entwurf (Vorlage) und öffnet dessen Editor."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     neu = beleg_service.dupliziere_beleg(session, beleg, benutzer_id=benutzer.id)
     session.commit()
     return _editor_redirect(neu.id)
@@ -741,7 +766,7 @@ def sn_dialog(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: SN-Auswahl (Checkboxen) für eine Lieferschein-Position im Entwurf."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position, artikel = _lade_sn_position(session, beleg, position_id, Belegart.LIEFERSCHEIN)
     if beleg.status != BelegStatus.ENTWURF:
         return _meldung(
@@ -776,7 +801,7 @@ def sn_zuweisen(
     session: Session = Depends(get_session),
 ):
     """Übernimmt die SN-Auswahl (ersetzt die bisherige Zuordnung) und liefert das Grid."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position, _ = _lade_sn_position(session, beleg, position_id, Belegart.LIEFERSCHEIN)
     try:
         seriennummer_service.weise_sns_zu(session, position, seriennummer_ids)
@@ -796,7 +821,7 @@ def sn_erfassung(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: SN-Erfassung (Textfelder) für eine EK-Lieferschein-Position im Entwurf."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position, _ = _lade_sn_position(session, beleg, position_id, Belegart.EK_LIEFERSCHEIN)
     if beleg.status != BelegStatus.ENTWURF:
         return _meldung(
@@ -823,7 +848,7 @@ def sn_erfassen(
     session: Session = Depends(get_session),
 ):
     """Übernimmt erfasste Wareneingangs-SNs (leere Felder ignoriert) und liefert das Grid."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     position, _ = _lade_sn_position(session, beleg, position_id, Belegart.EK_LIEFERSCHEIN)
     bereinigt = [sn.strip() for sn in sns if sn.strip()]
     try:
@@ -847,7 +872,7 @@ def kopf_speichern(  # noqa: PLR0913
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     try:
         beleg_service.pruefe_bearbeitbar(beleg)
     except BelegGesperrt as exc:
@@ -891,32 +916,35 @@ def _statuswechsel(
 
 @router.post("/detail/{beleg_id}/status/gedruckt")
 def status_gedruckt(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     erfolg_query = "?gebucht=1" if beleg.belegart == Belegart.LIEFERSCHEIN else ""
     return _statuswechsel(session, beleg, BelegStatus.GEDRUCKT, benutzer, erfolg_query)
 
 
 @router.post("/detail/{beleg_id}/status/erledigt")
 def status_erledigt(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     return _statuswechsel(session, beleg, BelegStatus.ERLEDIGT, benutzer)
 
 
 @router.post("/detail/{beleg_id}/status/storniert")
 def status_storniert(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(require_admin),
     session: Session = Depends(get_session),
 ):
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     return _statuswechsel(session, beleg, BelegStatus.STORNIERT, benutzer)
 
 
@@ -928,7 +956,7 @@ def folgebeleg_dialog(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: Teilmengen-Auswahl für den Folgebeleg (nur offene Restmengen)."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     ziel_art = beleg_service.FOLGEBELEGART.get(beleg.belegart)
     if ziel_art is None or beleg.status not in (BelegStatus.GEDRUCKT, BelegStatus.ERLEDIGT):
         return _meldung(
@@ -961,7 +989,7 @@ async def folgebeleg_erzeugen(
 ):
     """Erzeugt den Folgebeleg. Mit ``menge_<id>``-Feldern → Teilübernahme;
     ohne diese Felder (Abwärtskompatibilität) volle Übernahme aller Positionen."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     formular = await request.form()
     mengen: dict[int, Decimal] = {}
     for schluessel, wert in formular.items():
@@ -994,7 +1022,7 @@ def abschlag_dialog(
     session: Session = Depends(get_session),
 ):
     """HTMX-Partial: Eingabe für eine Abschlagsrechnung (nur aus gedrucktem Auftrag)."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     if beleg.belegart != Belegart.AUFTRAG or beleg.status not in (
         BelegStatus.GEDRUCKT,
         BelegStatus.ERLEDIGT,
@@ -1019,6 +1047,7 @@ def abschlag_dialog(
 
 @router.post("/detail/{beleg_id}/abschlagsrechnung")
 def abschlagsrechnung_erzeugen(
+    request: Request,
     beleg_id: int,
     prozent: str = Form(""),
     betrag: str = Form(""),
@@ -1026,7 +1055,7 @@ def abschlagsrechnung_erzeugen(
     session: Session = Depends(get_session),
 ):
     """Erzeugt eine Abschlagsrechnung aus einem Auftrag und öffnet deren Editor."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     prozent_wert = parse_decimal(prozent) if prozent.strip() else None
     betrag_wert = parse_decimal(betrag) if betrag.strip() else None
     if prozent_wert is None and betrag_wert is None:
@@ -1048,12 +1077,13 @@ def abschlagsrechnung_erzeugen(
 
 @router.post("/detail/{beleg_id}/schlussrechnung")
 def schlussrechnung_erzeugen(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Erzeugt die Schlussrechnung eines Auftrags (mit Abschlagsabzug) und öffnet sie."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     try:
         neu = beleg_service.erzeuge_schlussrechnung(session, beleg, benutzer_id=benutzer.id)
     except (UngueltigeBelegart, UngueltigerStatusUebergang, WerkplusFehler) as exc:
@@ -1094,12 +1124,13 @@ def _lieferschein_liste_redirect(fehler: str) -> RedirectResponse:
 
 @router.post("/detail/{beleg_id}/bezahlt")
 def beleg_bezahlt(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Markiert einen zahlungsrelevanten Beleg als bezahlt (bezahlt_am = heute)."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     if beleg.belegart not in ZAHLUNGSARTEN:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1113,12 +1144,13 @@ def beleg_bezahlt(
 
 @router.post("/detail/{beleg_id}/offen")
 def beleg_offen(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Setzt einen zahlungsrelevanten Beleg wieder auf offen (bezahlt_am = None)."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     if beleg.belegart not in ZAHLUNGSARTEN:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1132,12 +1164,13 @@ def beleg_offen(
 
 @router.get("/detail/{beleg_id}/druckvorschau")
 def beleg_druckvorschau(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """HTML-Vorschau der Druckvorlage — funktioniert auch ohne WeasyPrint/GTK."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     from app.services import pdf_service
 
     return Response(content=pdf_service.render_beleg_html(session, beleg), media_type="text/html")
@@ -1145,12 +1178,13 @@ def beleg_druckvorschau(
 
 @router.get("/detail/{beleg_id}/pdf")
 def beleg_pdf(
+    request: Request,
     beleg_id: int,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     """Rendert den Beleg als PDF (WeasyPrint); 503, wenn die PDF-Erzeugung fehlt."""
-    beleg = _lade_beleg(session, beleg_id)
+    beleg = _lade_beleg(session, beleg_id, request)
     try:
         from app.services import pdf_service
     except ImportError:

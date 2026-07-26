@@ -13,7 +13,7 @@ from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, ist_admin
 from app.models import (
     BEREICH_LABELS,
     BEREICHE,
@@ -157,13 +157,33 @@ def rolle_neu_form(
     )
 
 
-def _rolle_aus_form(rolle: Rollenprofil, form) -> Rollenprofil:
+def _rolle_aus_form(rolle: Rollenprofil, form, darf_admin_setzen: bool) -> Rollenprofil:
+    """Rollenfelder aus dem Formular übernehmen.
+
+    ``ist_admin`` darf nur ein echter Admin setzen — sonst könnte sich jemand mit
+    bloßem Benutzer-Bearbeitungsrecht über eine neue Admin-Rolle selbst erhöhen.
+    """
     rolle.beschreibung = (form.get("beschreibung") or "").strip()
-    rolle.ist_admin = form.get("ist_admin") is not None
+    if darf_admin_setzen:
+        rolle.ist_admin = form.get("ist_admin") is not None
     rolle.darf_kalkulation_sehen = form.get("darf_kalkulation_sehen") is not None
     for bereich in BEREICHE:
         setattr(rolle, f"recht_{bereich}", _zugriff(form.get(f"recht_{bereich}", "")))
     return rolle
+
+
+def _aktive_admins(session: Session) -> list[Benutzer]:
+    """Aktive Benutzer, deren Rolle Admin-Rechte hat (für die Lockout-Sperre)."""
+    admin_rollen = {
+        r.name for r in session.exec(select(Rollenprofil).where(Rollenprofil.ist_admin)).all()
+    }
+    # Fallback für Bestände ohne Rollenprofil: Rollenname "admin" gilt als Admin.
+    admin_rollen.add("admin")
+    return [
+        b
+        for b in session.exec(select(Benutzer).where(Benutzer.aktiv)).all()
+        if b.rolle in admin_rollen
+    ]
 
 
 @router.post("/rollen/neu")
@@ -174,7 +194,9 @@ async def rolle_neu(
 ):
     form = await request.form()
     name = (form.get("name") or "").strip()
-    rolle = _rolle_aus_form(Rollenprofil(name=name), form)
+    rolle = _rolle_aus_form(
+        Rollenprofil(name=name), form, darf_admin_setzen=ist_admin(session, benutzer)
+    )
     fehler = None
     if not name:
         fehler = "Name darf nicht leer sein."
@@ -243,7 +265,7 @@ async def rolle_bearbeiten(
                     ),
                 )
             rolle.name = neuer_name
-    _rolle_aus_form(rolle, form)
+    _rolle_aus_form(rolle, form, darf_admin_setzen=ist_admin(session, benutzer))
     session.add(rolle)
     session.commit()
     return RedirectResponse(
@@ -319,10 +341,31 @@ def benutzer_bearbeiten(
     session: Session = Depends(get_session),
 ):
     obj = _lade_benutzer(session, benutzer_id)
+    neu_aktiv = True if obj.id == benutzer.id else aktiv
+    # Aussperr-Schutz: der letzte aktive Admin darf weder deaktiviert noch auf
+    # eine Rolle ohne Admin-Rechte umgestellt werden.
+    admins = _aktive_admins(session)
+    ist_letzter_admin = len(admins) == 1 and admins[0].id == obj.id
+    verliert_admin = ist_letzter_admin and (not neu_aktiv or rolle != obj.rolle)
+    if verliert_admin:
+        return templates.TemplateResponse(
+            request,
+            "benutzer/form.html",
+            {
+                "benutzer": obj,
+                "neu": False,
+                "rollen": _rollen(session),
+                "ist_selbst": obj.id == benutzer.id,
+                "fehler": (
+                    "Das ist der letzte aktive Administrator — Rolle und Status "
+                    "können nicht geändert werden. Zuerst einen weiteren Admin anlegen."
+                ),
+            },
+        )
     obj.name = name.strip()
     obj.rolle = rolle
     # Sich selbst nicht deaktivieren — eigene Deaktivierung wird ignoriert.
-    obj.aktiv = True if obj.id == benutzer.id else aktiv
+    obj.aktiv = neu_aktiv
     if passwort.strip():
         obj.passwort_hash = hash_passwort(passwort)
     session.add(obj)

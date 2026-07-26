@@ -18,14 +18,14 @@ PNG_BYTES = bytes.fromhex(
 )
 
 
-def _login(engine, client, login="tester", passwort="geheim"):
+def _login(engine, client, login="tester", passwort="geheim", rolle=Rolle.SACHBEARBEITER):
     """Legt einen Benutzer an und meldet den Client an."""
     with Session(engine) as session:
         benutzer = Benutzer(
             login=login,
             name="Tester",
             passwort_hash=hash_passwort(passwort),
-            rolle=Rolle.SACHBEARBEITER,
+            rolle=rolle,
             aktiv=True,
         )
         session.add(benutzer)
@@ -117,7 +117,8 @@ def test_screenshot_upload(engine, client):
 
 
 def test_liste_zeigt_reports_und_erneut_senden(engine, client):
-    _login(engine, client)
+    # Die Meldungsliste ist Admin-only (enthält fremde Meldungen samt Browser-Infos).
+    _login(engine, client, rolle=Rolle.ADMIN)
     client.post("/bugreport", data={"typ": "bug", "titel": "Offener Fehler"})
 
     r = client.get("/bugreport")
@@ -127,8 +128,16 @@ def test_liste_zeigt_reports_und_erneut_senden(engine, client):
     assert "Erneut an GitHub senden" in r.text
 
 
+def test_liste_fuer_nicht_admin_verboten(engine, client):
+    """Sachbearbeiter darf melden, aber nicht die Meldungen aller anderen sehen."""
+    _login(engine, client, rolle=Rolle.SACHBEARBEITER)
+    assert client.post("/bugreport", data={"typ": "bug", "titel": "Meins"}).status_code == 200
+    assert client.get("/bugreport").status_code == 403
+    assert client.post("/bugreport/1/senden", follow_redirects=False).status_code == 403
+
+
 def test_erneut_senden_mit_gemocktem_github(engine, client, monkeypatch):
-    _login(engine, client)
+    _login(engine, client, rolle=Rolle.ADMIN)
     client.post("/bugreport", data={"typ": "bug", "titel": "Retry"})
     with Session(engine) as session:
         report_id = session.exec(select(BugReport)).one().id

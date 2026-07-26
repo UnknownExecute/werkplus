@@ -6,7 +6,8 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.dependencies import get_current_user
 from app.models import Adresse, Artikel, Beleg, Benutzer
-from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS
+from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS, _bereich_fuer
+from app.services.berechtigung import darf_bereich
 from app.templating import templates
 
 router = APIRouter(tags=["suche"])
@@ -73,9 +74,17 @@ def suche(
     belege: list[tuple[Beleg, Adresse]] = []
     if len(begriff) >= MIN_LAENGE:
         muster = f"%{begriff}%"
-        adressen = _suche_adressen(session, muster)
-        artikel = _suche_artikel(session, muster)
-        belege = _suche_belege(session, muster)
+        # Jede Trefferguppe nur, wenn der Benutzer den Bereich sehen darf —
+        # die Suche darf keine Abkürzung um die Bereichsrechte sein.
+        if darf_bereich(request, "adressen"):
+            adressen = _suche_adressen(session, muster)
+        if darf_bereich(request, "artikel"):
+            artikel = _suche_artikel(session, muster)
+        belege = [
+            (beleg, adresse)
+            for beleg, adresse in _suche_belege(session, muster)
+            if darf_bereich(request, _bereich_fuer(beleg.belegart))
+        ]
     return templates.TemplateResponse(
         request,
         "suche.html",

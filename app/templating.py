@@ -53,6 +53,11 @@ from app.services import berechtigung  # noqa: E402
 
 templates.env.globals["darf_bereich"] = berechtigung.darf_bereich
 templates.env.globals["darf_kalkulation"] = berechtigung.darf_kalkulation
+
+# CSRF-Token für Formulare/Meta-Tag (siehe app.security + werkplus.js).
+from app.security import csrf_token  # noqa: E402
+
+templates.env.globals["csrf_token"] = csrf_token
 # Hinweis: Kein globales `firma` mehr — die Firmenstammdaten stammen jetzt aus der
 # DB (app.services.firma_service). Nur PDF-Templates nutzen `firma`; sie erhalten es
 # über den PDF-Kontext (pdf_service._baue_kontext). Kein Nicht-PDF-Template greift

@@ -35,6 +35,17 @@ class Settings:
     # Issues-Schreibrecht; repo im Format "owner/repo". Leer = nur lokal speichern.
     github_token: str = os.environ.get("WERKPLUS_GITHUB_TOKEN", "")
     github_repo: str = os.environ.get("WERKPLUS_GITHUB_REPO", "")
+    # CSRF-Schutz für schreibende Requests. Standard: an. Die Testsuite schaltet
+    # ihn global ab (und deckt ihn gezielt in tests/test_csrf.py ab).
+    csrf_aktiv: bool = os.environ.get("WERKPLUS_CSRF", "1") != "0"
+    # Secure-Flag des Session-Cookies. Standard: in Produktion an (HTTPS-Pflicht).
+    # WICHTIG: Bei reinem HTTP-Zugriff (z. B. direkt http://<NAS-IP>:9999 ohne
+    # HTTPS-Reverse-Proxy) sendet der Browser das Cookie dann NICHT — Login
+    # scheitert. In diesem Fall WERKPLUS_COOKIE_SECURE=0 setzen.
+    cookie_secure: bool = os.environ.get(
+        "WERKPLUS_COOKIE_SECURE",
+        "1" if os.environ.get("WERKPLUS_ENV", "development") == "production" else "0",
+    ) != "0"
     firma: Firmendaten = field(default_factory=Firmendaten)
 
 

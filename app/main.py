@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,16 +23,27 @@ from app.routers import (
     suche,
     textbausteine,
 )
+from app.security import csrf_schutz, sicherheits_header
 from app.services.buchung import registriere_lager_hooks
 from app.templating import templates
 
-app = FastAPI(title="WerkPlus", docs_url=None, redoc_url=None)
+# Globale CSRF-Wache: gilt für jede Route (Static-Mounts ausgenommen).
+app = FastAPI(
+    title="WerkPlus", docs_url=None, redoc_url=None,
+    dependencies=[Depends(csrf_schutz)],
+)
+
+# Sicherheits-Header auf jede Antwort (Clickjacking/MIME/Referrer/CSP).
+app.middleware("http")(sicherheits_header)
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     max_age=settings.session_max_age,
     same_site="lax",
+    # Nur über HTTPS senden (Standard in Produktion). Bei reinem HTTP-Zugriff
+    # per WERKPLUS_COOKIE_SECURE=0 abschaltbar — siehe app/config.py.
+    https_only=settings.cookie_secure,
 )
 
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")

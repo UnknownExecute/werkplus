@@ -22,7 +22,8 @@ from app.models import (
     BelegStatus,
     Benutzer,
 )
-from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS
+from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS, _bereich_fuer
+from app.services.berechtigung import darf_bereich
 from app.templating import templates
 
 router = APIRouter(tags=["dashboard"])
@@ -109,10 +110,23 @@ def dashboard(
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    angebote, angebote_anzahl = _offene_belege(session, Belegart.ANGEBOT)
-    auftraege, auftraege_anzahl = _offene_belege(session, Belegart.AUFTRAG)
-    offene_posten, offen_gesamt, offene_posten_anzahl = _offene_posten(session)
-    wartungen = _faellige_wartungen(session)
+    # Das Dashboard zeigt nur, was der Benutzer laut Bereichsrechten sehen darf.
+    darf_verkauf = darf_bereich(request, "verkauf")
+    angebote, angebote_anzahl = (
+        _offene_belege(session, Belegart.ANGEBOT) if darf_verkauf else ([], 0)
+    )
+    auftraege, auftraege_anzahl = (
+        _offene_belege(session, Belegart.AUFTRAG) if darf_verkauf else ([], 0)
+    )
+    offene_posten, offen_gesamt, offene_posten_anzahl = (
+        _offene_posten(session) if darf_verkauf else ([], Decimal("0.00"), 0)
+    )
+    wartungen = _faellige_wartungen(session) if darf_bereich(request, "anlagen") else []
+    letzte_belege = [
+        (beleg, adresse)
+        for beleg, adresse in _letzte_belege(session)
+        if darf_bereich(request, _bereich_fuer(beleg.belegart))
+    ]
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -126,7 +140,7 @@ def dashboard(
             "offen_gesamt": offen_gesamt,
             "offene_posten_anzahl": offene_posten_anzahl,
             "wartungen": wartungen,
-            "letzte_belege": _letzte_belege(session),
+            "letzte_belege": letzte_belege,
             "heute": date.today(),
             "belegart_labels": BELEGART_LABELS,
             "status_labels": STATUS_LABELS,

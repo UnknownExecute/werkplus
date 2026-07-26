@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models import Benutzer, BugReport, MeldungTyp
 from app.services import github_service
 from app.templating import templates
@@ -123,9 +123,10 @@ def bug_melder_modal(
 @router.get("")
 def bugreport_liste(
     request: Request,
-    benutzer: Benutzer = Depends(get_current_user),
+    benutzer: Benutzer = Depends(require_admin),
     session: Session = Depends(get_session),
 ):
+    """Alle Meldungen — nur für Admins (enthält fremde Meldungen samt Browser-Infos)."""
     reports = session.exec(
         select(BugReport).order_by(BugReport.erstellt_am.desc())
     ).all()
@@ -181,9 +182,10 @@ async def bugreport_anlegen(
 def bugreport_erneut_senden(
     request: Request,
     report_id: int,
-    benutzer: Benutzer = Depends(get_current_user),
+    benutzer: Benutzer = Depends(require_admin),
     session: Session = Depends(get_session),
 ):
+    """Erneuter GitHub-Versand — nur für Admins (löst externen Aufruf aus)."""
     report = session.get(BugReport, report_id)
     if report is None:
         raise HTTPException(
