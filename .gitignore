@@ -19,3 +19,9 @@ app/static/bugreports/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Lokaler Wissensgraph / Obsidian-Vault + graphify-Ausgabe (bleibt lokal, nie ins Repo)
+/wissen/
+# Sicherheitsnetz: graphify legt seinen Cache/Output relativ zum CWD ab
+graphify-out/
+.graphify*
