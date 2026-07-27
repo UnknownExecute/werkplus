@@ -81,19 +81,36 @@
   </div>
 
   <div class="tab-pane fade" id="tab-anlagen">
+    {# Kunde ist hier bereits bekannt und wird im Formular vorausgewählt —
+       auch Bestandsanlagen (Altgeräte ohne Lieferschein) sind so erfassbar. #}
+    {% if darf_bereich(request, 'anlagen', 'bearbeiten') %}
+    <div class="d-flex justify-content-end mb-3">
+      <a class="btn btn-sm btn-primary" href="/anlagen/neu?adresse_id={{ adresse.id }}">
+        Anlage anlegen
+      </a>
+    </div>
+    {% endif %}
     <table class="table table-hover tabelle-kompakt">
       <thead>
-        <tr><th>Artikel</th><th>Standort</th><th>Nächste Wartung</th></tr>
+        <tr><th>Artikel</th><th>Seriennummer</th><th>Standort</th><th>Nächste Wartung</th></tr>
       </thead>
       <tbody>
         {% for anlage, anlage_artikel in anlagen %}
         <tr>
-          <td>{{ anlage_artikel.bezeichnung }}</td>
+          <td><a href="/anlagen/{{ anlage.id }}">{{ anlage_artikel.bezeichnung }}</a></td>
+          <td>{{ anlagen_sn.get(anlage.id, "") }}</td>
           <td>{{ anlage.standort }}</td>
           <td>{{ anlage.naechste_wartung | datum }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="3" class="text-muted">Keine Anlagen vorhanden.</td></tr>
+        <tr>
+          <td colspan="4" class="text-muted">
+            Noch keine Anlagen erfasst.
+            {% if darf_bereich(request, 'anlagen', 'bearbeiten') %}
+            Mit „Anlage anlegen“ auch Altgeräte ohne Lieferschein eintragen.
+            {% endif %}
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>

@@ -21,6 +21,7 @@ from app.models import (
     Belegart,
     BelegStatus,
     Benutzer,
+    Seriennummer,
 )
 from app.pagination import Blaetterwerk, blaettere
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS
@@ -328,6 +329,18 @@ def _detail_kontext(session: Session, adresse: Adresse) -> dict:
             .where(Anlage.adresse_id == adresse.id)
         ).all()
     )
+    # Seriennummer je Anlage — sie identifiziert das Gerät beim Kunden und ist
+    # das, wonach am Telefon gefragt wird ("welche Therme steht da?").
+    anlagen_sn: dict[int, str] = {}
+    if anlagen:
+        anlagen_sn = {
+            anlage_id: sn
+            for anlage_id, sn in session.exec(
+                select(Anlage.id, Seriennummer.sn)  # type: ignore[arg-type]
+                .join(Seriennummer, Anlage.seriennummer_id == Seriennummer.id)  # type: ignore[arg-type]
+                .where(Anlage.adresse_id == adresse.id)
+            ).all()
+        }
     aktivitaeten = list(
         session.exec(
             select(Aktivitaet)
@@ -339,6 +352,7 @@ def _detail_kontext(session: Session, adresse: Adresse) -> dict:
         "adresse": adresse,
         "belege": belege,
         "anlagen": anlagen,
+        "anlagen_sn": anlagen_sn,
         "aktivitaeten": aktivitaeten,
         "belegart_labels": BELEGART_LABELS,
         "status_labels": STATUS_LABELS,

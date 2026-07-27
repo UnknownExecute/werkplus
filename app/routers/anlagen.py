@@ -80,8 +80,14 @@ def _listen_kontext(session: Session, q: str, wartung: str) -> dict:
     }
 
 
-def _frei_formular(request: Request, session: Session, fehler: str = ""):
-    """Formular-Modus (a): freie Anlage/Bestandsanlage ohne Beleg-Bezug."""
+def _frei_formular(
+    request: Request, session: Session, fehler: str = "", adresse_id: int | None = None
+):
+    """Formular-Modus (a): freie Anlage/Bestandsanlage ohne Beleg-Bezug.
+
+    ``adresse_id`` wählt den Kunden vor — genutzt vom Knopf „Anlage anlegen" auf
+    der Kunden-Detailseite, damit man den Kunden nicht erneut suchen muss.
+    """
     kunden = session.exec(
         select(Adresse)
         .where(
@@ -105,6 +111,7 @@ def _frei_formular(request: Request, session: Session, fehler: str = ""):
             "artikel_liste": artikel_liste,
             "sn_optionen": sn_optionen,
             "fehler": fehler,
+            "vorgewaehlte_adresse_id": adresse_id,
         },
     )
 
@@ -169,13 +176,14 @@ def anlagen_suche(
 def anlage_neu_form(
     request: Request,
     von_beleg: int | None = None,
+    adresse_id: int | None = None,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     if von_beleg is not None:
         beleg = _lade_gebuchten_lieferschein(session, von_beleg)
         return _beleg_formular(request, session, beleg)
-    return _frei_formular(request, session)
+    return _frei_formular(request, session, adresse_id=adresse_id)
 
 
 @router.post("/neu")

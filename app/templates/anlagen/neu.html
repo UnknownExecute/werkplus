@@ -79,7 +79,8 @@
       <select class="form-select" name="adresse_id" required>
         <option value="">– bitte wählen –</option>
         {% for kunde in kunden %}
-        <option value="{{ kunde.id }}">{{ kunde.firma }}{% if kunde.ort %} ({{ kunde.ort }}){% endif %}</option>
+        <option value="{{ kunde.id }}"
+                {% if vorgewaehlte_adresse_id and kunde.id == vorgewaehlte_adresse_id %}selected{% endif %}>{{ kunde.firma }}{% if kunde.ort %} ({{ kunde.ort }}){% endif %}</option>
         {% endfor %}
       </select>
     </div>
