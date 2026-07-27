@@ -28,6 +28,47 @@ class GitHubFehler(Exception):
     """Der GitHub-API-Aufruf ist fehlgeschlagen (HTTP- oder Netzwerkfehler)."""
 
 
+# Klartext-Hinweise je HTTP-Status. Rohes GitHub-JSON im Meldedialog hilft
+# niemandem — der Anwender soll lesen können, WAS zu tun ist.
+# Erfahrungswert: Ein abgeschnittener Token (beim Kopieren vorne/hinten verloren)
+# ist die häufigste Ursache für 401.
+_STATUS_HINWEISE: dict[int, str] = {
+    401: (
+        "GitHub lehnt den Zugangs-Token ab (401). Er ist ungültig, abgelaufen "
+        "oder beim Kopieren unvollständig geraten. Bitte WERKPLUS_GITHUB_TOKEN "
+        "in der .env prüfen (ein fine-grained Token beginnt mit „github_pat_“) "
+        "und den Container neu starten."
+    ),
+    403: (
+        "GitHub verweigert den Zugriff (403). Dem Token fehlt die Berechtigung "
+        "„Issues: Read and write“ für dieses Repository — oder es greift gerade "
+        "ein Anfragelimit."
+    ),
+    404: (
+        "Das Repository wurde nicht gefunden (404). Bitte WERKPLUS_GITHUB_REPO "
+        "prüfen (Format „owner/repo“) und ob der Token Zugriff auf dieses "
+        "private Repository hat."
+    ),
+    422: (
+        "GitHub hat die Meldung abgelehnt (422) — meist ein unzulässiges Label "
+        "oder ein leerer Titel."
+    ),
+}
+
+
+def _fehlertext(status: int, rohantwort: str) -> str:
+    """Baut eine verständliche Fehlermeldung; Rohtext nur bei unbekanntem Status.
+
+    Der Rohtext bleibt für unerwartete Fälle erhalten (Diagnose), wird aber
+    gekürzt, damit der Meldedialog lesbar bleibt.
+    """
+    hinweis = _STATUS_HINWEISE.get(status)
+    if hinweis:
+        return hinweis
+    kurz = " ".join(rohantwort.split())[:200]
+    return f"GitHub-Fehler {status}: {kurz}"
+
+
 def ist_konfiguriert() -> bool:
     """True, wenn sowohl Token als auch Repo gesetzt sind."""
     return bool(settings.github_token) and bool(settings.github_repo)
@@ -71,9 +112,10 @@ def erstelle_issue(titel: str, koerper: str, labels: list[str]) -> tuple[int, st
                 "GitHub-Fehlerantwort (HTTP %s) nicht lesbar: %s", fehler.code, lesefehler
             )
             meldung = str(fehler)
-        raise GitHubFehler(
-            f"GitHub-Fehler {fehler.code}: {meldung}"
-        ) from fehler
+        # Den Rohtext ins Log (dort ist Platz für Diagnose), in die Meldung nur
+        # den Klartext-Hinweis. Der Token steckt nie in der Antwort.
+        logger.warning("GitHub-Fehlerantwort (HTTP %s): %s", fehler.code, meldung)
+        raise GitHubFehler(_fehlertext(fehler.code, meldung)) from fehler
     except urllib.error.URLError as fehler:
         raise GitHubFehler(
             f"GitHub nicht erreichbar: {fehler.reason}"
