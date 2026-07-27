@@ -1,9 +1,17 @@
-"""Firmenstammdaten pflegen (nur Admin): Formular und Speichern."""
+"""Firmenstammdaten pflegen (nur Admin): Formular und Speichern.
+
+Zeigt zusätzlich Programmversion und Codestand — damit nach einem Update in der
+Oberfläche prüfbar ist, ob der neue Stand wirklich läuft.
+"""
+
+import logging
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import text
 from sqlmodel import Session
 
+from app.config import settings
 from app.database import get_session
 from app.dependencies import require_admin
 from app.models import Benutzer
@@ -11,6 +19,29 @@ from app.services import firma_service
 from app.templating import templates
 
 router = APIRouter(tags=["einstellungen"])
+
+logger = logging.getLogger(__name__)
+
+
+def _db_revision(session: Session) -> str:
+    """Aktuelle Alembic-Revision der Datenbank (leer, wenn nicht ermittelbar).
+
+    Nützlich zur Kontrolle, ob die Migrationen beim Containerstart durchliefen:
+    Passt die Revision nicht zur erwarteten, hängt das Schema zurück.
+    """
+    try:
+        wert = session.exec(text("SELECT version_num FROM alembic_version")).first()
+    except Exception:  # noqa: BLE001 — reine Anzeige, darf die Seite nie kippen
+        logger.debug("Alembic-Revision nicht lesbar", exc_info=True)
+        return ""
+    if wert is None:
+        return ""
+    # SQLAlchemy liefert ein Row-Objekt — das ist KEIN echtes tuple, ein
+    # isinstance(..., tuple) griffe also nicht und str() ergäbe "('abc',)".
+    try:
+        return str(wert[0])
+    except (TypeError, IndexError, KeyError):
+        return str(wert)
 
 
 @router.get("/einstellungen")
@@ -24,7 +55,12 @@ def einstellungen_form(
     return templates.TemplateResponse(
         request,
         "einstellungen.html",
-        {"firma": firma, "gespeichert": gespeichert},
+        {
+            "firma": firma,
+            "gespeichert": gespeichert,
+            "umgebung": settings.env,
+            "db_revision": _db_revision(session),
+        },
     )
 
 

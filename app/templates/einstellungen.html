@@ -59,5 +59,30 @@
       <button class="btn btn-primary" type="submit">Speichern</button>
     </form>
   </div>
+
+  {# Version + Codestand: damit nach einem Update in der UI prüfbar ist, ob der
+     neue Stand wirklich läuft. "Stand" = Zeitstempel der neuesten
+     Programmdatei, ändert sich bei jedem Ausrollen automatisch. #}
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6 card-title">Programmversion</h2>
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Version</dt>
+          <dd class="col-7"><span id="wp-version">{{ werkplus_version }}</span></dd>
+          <dt class="col-5 text-muted">Stand</dt>
+          <dd class="col-7">{{ werkplus_stand() | datum }}, {{ werkplus_stand().strftime('%H:%M') }}</dd>
+          <dt class="col-5 text-muted">Umgebung</dt>
+          <dd class="col-7">{{ umgebung }}</dd>
+          <dt class="col-5 text-muted">Datenbank</dt>
+          <dd class="col-7">Schema {{ db_revision or "unbekannt" }}</dd>
+        </dl>
+        <p class="text-muted small mb-0 mt-3">
+          Stimmt der Stand nach einem Update nicht, wurde der Container nicht neu
+          gestartet — oder der Browser zeigt eine alte Seite (dann <kbd>Ctrl</kbd>+<kbd>F5</kbd>).
+        </p>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

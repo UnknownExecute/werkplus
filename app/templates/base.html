@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token(request) }}">
   <title>{% block title %}WerkPlus{% endblock %} – WerkPlus</title>
-  <link rel="stylesheet" href="/static/bootstrap.min.css">
-  <link rel="stylesheet" href="/static/werkplus.css">
+  {# ?v=… wechselt bei jedem Ausrollen (app/version.py). Ohne diesen Cache-Buster
+     kann der Browser altes JS mit neuem Servercode kombinieren — dann schlagen
+     schreibende Anfragen am CSRF-Schutz fehl, weil der Token nicht mitgesendet
+     wird. Genau das ist im Betrieb passiert. #}
+  {% set av = asset_version() %}
+  <link rel="stylesheet" href="/static/bootstrap.min.css?v={{ av }}">
+  <link rel="stylesheet" href="/static/werkplus.css?v={{ av }}">
   <script>
     // Theme möglichst früh setzen (kein Flackern beim Laden)
     (function () {
@@ -14,7 +19,7 @@
       document.documentElement.setAttribute("data-bs-theme", t);
     })();
   </script>
-  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/htmx.min.js?v={{ av }}" defer></script>
 </head>
 <body>
 {% set benutzer_angemeldet = request.session.get("benutzer_id") %}
@@ -119,7 +124,7 @@
 {% else %}
 </main>
 {% endif %}
-<script src="/static/bootstrap.bundle.min.js" defer></script>
-<script src="/static/werkplus.js" defer></script>
+<script src="/static/bootstrap.bundle.min.js?v={{ av }}" defer></script>
+<script src="/static/werkplus.js?v={{ av }}" defer></script>
 </body>
 </html>

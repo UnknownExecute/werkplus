@@ -58,6 +58,14 @@ templates.env.globals["darf_kalkulation"] = berechtigung.darf_kalkulation
 from app.security import csrf_token  # noqa: E402
 
 templates.env.globals["csrf_token"] = csrf_token
+
+# Version/Codestand: in den Einstellungen sichtbar und als Cache-Buster an den
+# CSS-/JS-URLs (siehe app/version.py — verhindert altes JS bei neuem Server).
+from app.version import VERSION, asset_version, code_stand  # noqa: E402
+
+templates.env.globals["werkplus_version"] = VERSION
+templates.env.globals["werkplus_stand"] = code_stand
+templates.env.globals["asset_version"] = asset_version
 # Hinweis: Kein globales `firma` mehr — die Firmenstammdaten stammen jetzt aus der
 # DB (app.services.firma_service). Nur PDF-Templates nutzen `firma`; sie erhalten es
 # über den PDF-Kontext (pdf_service._baue_kontext). Kein Nicht-PDF-Template greift
