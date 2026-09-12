@@ -85,7 +85,7 @@ class TestErstelleBeleg:
     def test_nummer_status_zahlungsziel(self, session, adresse):
         beleg = erstelle_beleg(session, Belegart.ANGEBOT, adresse, benutzer_id=None)
         jahr = date.today().year
-        assert beleg.belegnr == f"AN-{jahr}-0001"
+        assert beleg.belegnr == f"{jahr % 100:02d}0001"
         assert beleg.status == BelegStatus.ENTWURF
         assert beleg.zahlungsziel_tage == 30  # von der Adresse übernommen
         assert beleg.adresse_id == adresse.id
@@ -535,7 +535,7 @@ class TestAbschlagUndSchluss:
         assert abschlag.auftrag_id == auftrag.id
         assert abschlag.status == BelegStatus.ENTWURF
         assert abschlag.adresse_id == auftrag.adresse_id
-        assert abschlag.belegnr.startswith("RE-")
+        assert abschlag.belegnr.isdigit()  # eigener Rechnungs-Nummernkreis (JJNNNN)
         # 20 % von 200 = 40 netto, 8 USt, 48 brutto
         assert abschlag.summe_netto == Decimal("40.00")
         assert abschlag.summe_brutto == Decimal("48.00")

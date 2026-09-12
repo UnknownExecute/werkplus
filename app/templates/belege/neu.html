@@ -15,14 +15,36 @@
     {% endif %}
   </div>
   <div class="mb-3">
-    <label class="form-label" for="datum">Datum</label>
-    <input class="form-control" type="date" name="datum" id="datum" value="{{ heute.isoformat() }}">
+    <label class="form-label" for="betreff">Betreff</label>
+    <input class="form-control" type="text" name="betreff" id="betreff" maxlength="200"
+           placeholder="z. B. Angebot Wartung Kompressor" autofocus>
   </div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label" for="datum">Datum</label>
+      <input class="form-control" type="date" name="datum" id="datum" value="{{ heute.isoformat() }}">
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label" for="termin">Termin</label>
+      <input class="form-control" type="date" name="termin" id="termin">
+    </div>
+  </div>
+  {% if belegart == 'auftrag' %}
+  <div class="mb-3">
+    <label class="form-label" for="auftragsart">Auftragsart</label>
+    <select class="form-select" name="auftragsart" id="auftragsart">
+      <option value="">– bitte wählen –</option>
+      {% for a in auftragsarten %}
+      <option value="{{ a }}">{{ auftragsart_labels[a] }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
   <div class="mb-3">
     <label class="form-label" for="kopftext">Kopftext</label>
     <textarea class="form-control" name="kopftext" id="kopftext" rows="3"></textarea>
   </div>
   <button class="btn btn-primary" type="submit" {% if not adressen %}disabled{% endif %}>Anlegen</button>
-  <a class="btn btn-outline-secondary" href="/belege/{{ belegart }}">Abbrechen</a>
+  <a class="btn btn-outline-secondary" href="{{ uebersicht_url }}">Abbrechen</a>
 </form>
 {% endblock %}

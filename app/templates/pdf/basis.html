@@ -84,6 +84,10 @@
   table.positionen tr.hat-sn td {
     border-bottom: none;
   }
+  .betreff {
+    font-weight: bold;
+    margin: -0.2cm 0 0.2cm;
+  }
   .langtext {
     font-size: 8.5pt;
     color: #444;
@@ -142,8 +146,11 @@
 </div>
 
 <h1>{% block belegtitel %}{{ belegart_label }} {{ beleg.belegnr }}{% endblock %}</h1>
+{% if beleg.betreff %}<div class="betreff">{{ beleg.betreff }}</div>{% endif %}
 <div class="belegmeta">
   Datum: {{ beleg.datum|datum }}
+  {% if beleg.termin %}&nbsp;&middot;&nbsp; Termin: {{ beleg.termin|datum }}{% endif %}
+  {% if beleg.belegart == 'auftrag' and auftragsart_label %}&nbsp;&middot;&nbsp; {{ auftragsart_label }}{% endif %}
   {% block meta_extra %}{% endblock %}
 </div>
 

@@ -31,7 +31,7 @@
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Offene Angebote <span class="badge text-bg-secondary">{{ angebote_anzahl }}</span></span>
-        <a href="/belege/angebot">Alle Angebote</a>
+        <a href="/belege/uebersicht/vk?art=angebot">Alle Angebote</a>
       </div>
       <div class="card-body p-0">
         {{ offene_beleg_tabelle(angebote, "Keine offenen Angebote.") }}
@@ -43,7 +43,7 @@
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Unfertige Aufträge <span class="badge text-bg-secondary">{{ auftraege_anzahl }}</span></span>
-        <a href="/belege/auftrag">Alle Aufträge</a>
+        <a href="/belege/uebersicht/vk?art=auftrag">Alle Aufträge</a>
       </div>
       <div class="card-body p-0">
         {{ offene_beleg_tabelle(auftraege, "Keine unfertigen Aufträge.") }}
@@ -55,7 +55,7 @@
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Offene Posten <span class="badge text-bg-secondary">{{ offene_posten_anzahl }}</span></span>
-        <a href="/belege/rechnung">Alle Rechnungen</a>
+        <a href="/belege/uebersicht/vk?art=rechnung">Alle Rechnungen</a>
       </div>
       <div class="card-body p-0">
         <table class="table table-hover tabelle-kompakt mb-0">

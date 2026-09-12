@@ -1,4 +1,12 @@
-"""Vergabe fortlaufender Belegnummern je Belegart und Jahr (z. B. RE-2026-0001).
+"""Vergabe fortlaufender Belegnummern je Belegart und Jahr (Kplus-Stil: ``260001``).
+
+Format (Anwenderwunsch, Sept. 2026): **zweistelliges Jahr + laufende Nummer**,
+rein numerisch, ohne Präfix — jede Belegart hat ihren eigenen Zähler, der mit
+dem Jahr neu beginnt. Angebot ``260001`` und Rechnung ``260001`` dürfen daher
+nebeneinander existieren (Eindeutigkeit gilt je Belegart, siehe
+``Beleg.__table_args__``). Der Startwert je Belegart/Jahr ist in den
+Einstellungen setzbar, damit nahtlos an die alte Kplus-Nummerierung
+angeschlossen werden kann.
 
 Atomik: Innerhalb der offenen Transaktion des Aufrufers wird der Zähler per
 ``INSERT ... ON CONFLICT DO NOTHING`` angelegt und per relativem
@@ -13,28 +21,21 @@ from datetime import date
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models.beleg import Belegart
-from app.services.fehler import UngueltigeBelegart
+from app.models.nummernkreis import Nummernkreis
+from app.services.fehler import UngueltigeBelegart, WerkplusFehler
 
-PRAEFIXE: dict[Belegart, str] = {
-    Belegart.ANGEBOT: "AN",
-    Belegart.AUFTRAG: "AB",
-    Belegart.LIEFERSCHEIN: "LS",
-    Belegart.RECHNUNG: "RE",
-    Belegart.GUTSCHRIFT: "GS",
-    Belegart.BESTELLUNG: "BE",
-    Belegart.EK_LIEFERSCHEIN: "WE",
-    Belegart.EK_RECHNUNG: "ER",
-}
+# Mindestbreite der laufenden Nummer (wächst automatisch über 9999 hinaus)
+STELLEN = 4
 
 _MAX_VERSUCHE = 10
 _BACKOFF_BASIS_SEK = 0.05
 
 _INSERT = text(
     "INSERT INTO nummernkreis (belegart, jahr, praefix, letzte_nummer) "
-    "VALUES (:belegart, :jahr, :praefix, 0) "
+    "VALUES (:belegart, :jahr, '', 0) "
     "ON CONFLICT (belegart, jahr) DO NOTHING"
 )
 _UPDATE = text(
@@ -46,18 +47,23 @@ _SELECT = text(
 )
 
 
+def formatiere_belegnr(jahr: int, nummer: int) -> str:
+    """``(2026, 1)`` → ``"260001"``: zweistelliges Jahr + laufende Nummer."""
+    return f"{jahr % 100:02d}{nummer:0{STELLEN}d}"
+
+
 def naechste_belegnr(session: Session, belegart: Belegart, jahr: int | None = None) -> str:
-    """Zieht atomar die nächste Belegnummer, z. B. ``RE-2026-0001``.
+    """Zieht atomar die nächste Belegnummer, z. B. ``260001``.
 
     Der Aufrufer hält die Transaktion — die Nummer ist erst mit seinem Commit
     endgültig vergeben. Bei "database is locked" wird mit kurzem Backoff
     erneut versucht (max. ~10 Versuche); die Engine hat busy_timeout=30s.
     """
-    if belegart not in PRAEFIXE:
-        raise UngueltigeBelegart(f"Kein Nummernkreis-Präfix für Belegart {belegart!r}")
+    if belegart not in set(Belegart):
+        raise UngueltigeBelegart(f"Kein Nummernkreis für Belegart {belegart!r}")
     if jahr is None:
         jahr = date.today().year
-    params = {"belegart": str(belegart), "jahr": jahr, "praefix": PRAEFIXE[belegart]}
+    params = {"belegart": str(belegart), "jahr": jahr}
 
     letzter_fehler: OperationalError | None = None
     for versuch in range(_MAX_VERSUCHE):
@@ -65,10 +71,47 @@ def naechste_belegnr(session: Session, belegart: Belegart, jahr: int | None = No
             session.execute(_INSERT, params)
             session.execute(_UPDATE, params)
             nummer = session.execute(_SELECT, params).scalar_one()
-            return f"{PRAEFIXE[belegart]}-{jahr}-{nummer:04d}"
+            return formatiere_belegnr(jahr, nummer)
         except OperationalError as fehler:
             if "database is locked" not in str(fehler):
                 raise
             letzter_fehler = fehler
             time.sleep(_BACKOFF_BASIS_SEK * (versuch + 1))
     raise letzter_fehler  # type: ignore[misc]  # nach _MAX_VERSUCHE immer gesetzt
+
+
+# ------------------------------------------------------------- Einstellungen
+
+
+def staende(session: Session, jahr: int | None = None) -> dict[Belegart, int]:
+    """Letzte vergebene Nummer je Belegart für ``jahr`` (0 = noch nichts vergeben)."""
+    if jahr is None:
+        jahr = date.today().year
+    kreise = session.exec(select(Nummernkreis).where(Nummernkreis.jahr == jahr)).all()
+    vorhanden = {k.belegart: k.letzte_nummer for k in kreise}
+    return {art: vorhanden.get(str(art), 0) for art in Belegart}
+
+
+def setze_stand(session: Session, belegart: Belegart, jahr: int, letzte_nummer: int) -> None:
+    """Setzt den Zähler (die nächste Nummer ist ``letzte_nummer + 1``).
+
+    Nur nach oben erlaubt: ein Zurücksetzen würde bereits vergebene Nummern
+    erneut ausgeben und an der Eindeutigkeit je Belegart scheitern.
+    """
+    if letzte_nummer < 0:
+        raise WerkplusFehler("Der Nummernstand darf nicht negativ sein")
+    kreis = session.exec(
+        select(Nummernkreis).where(
+            Nummernkreis.belegart == str(belegart), Nummernkreis.jahr == jahr
+        )
+    ).first()
+    if kreis is None:
+        kreis = Nummernkreis(belegart=str(belegart), jahr=jahr, praefix="", letzte_nummer=0)
+    if letzte_nummer < kreis.letzte_nummer:
+        raise WerkplusFehler(
+            f"Der Nummernstand kann nicht unter die letzte vergebene Nummer "
+            f"({formatiere_belegnr(jahr, kreis.letzte_nummer)}) gesetzt werden"
+        )
+    kreis.letzte_nummer = letzte_nummer
+    session.add(kreis)
+    session.flush()

@@ -2,14 +2,24 @@
 {% block title %}{{ label }} {{ beleg.belegnr }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <h1 class="h3 mb-0">
-    {{ label }} {{ beleg.belegnr }}
-    <span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span>
-    {% if zahlungsrelevant and zahlstatus %}
-    <span class="badge {{ zahlstatus_badges[zahlstatus] }}">
-      {{ zahlstatus_labels[zahlstatus] }}{% if zahlstatus == 'bezahlt' and beleg.bezahlt_am %} {{ beleg.bezahlt_am | datum }}{% endif %}</span>
-    {% endif %}
-  </h1>
+  <div>
+    <a class="small text-decoration-none" href="{{ uebersicht_url }}">&larr; Belegübersicht</a>
+    <h1 class="h3 mb-0">
+      {{ label }} {{ beleg.belegnr }}
+      <span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span>
+      {% if angebotsergebnis_label %}
+      <span class="badge {% if beleg.angebotsergebnis == 'erhalten' %}bg-success{% else %}bg-danger{% endif %}">{{ angebotsergebnis_label }}</span>
+      {% endif %}
+      {% if beleg.belegart == 'auftrag' and beleg.auftragsart %}
+      <span class="badge bg-info text-dark">{{ auftragsart_labels.get(beleg.auftragsart, '') }}</span>
+      {% endif %}
+      {% if zahlungsrelevant and zahlstatus %}
+      <span class="badge {{ zahlstatus_badges[zahlstatus] }}">
+        {{ zahlstatus_labels[zahlstatus] }}{% if zahlstatus == 'bezahlt' and beleg.bezahlt_am %} {{ beleg.bezahlt_am | datum }}{% endif %}</span>
+      {% endif %}
+    </h1>
+    {% if beleg.betreff %}<div class="text-muted">{{ beleg.betreff }}</div>{% endif %}
+  </div>
   <div class="d-flex gap-2 flex-wrap">
     {% if beleg.status == 'entwurf' %}
     {# Buchen friert die Summen ein und macht den Beleg unveränderlich —
@@ -17,6 +27,15 @@
     <form method="post" action="/belege/detail/{{ beleg.id }}/status/gedruckt"
           data-bestaetigen="{{ label }} {{ beleg.belegnr }} jetzt buchen? Danach ist der Beleg unveränderlich und die Summen sind fixiert.{% if beleg.belegart in ('lieferschein', 'ek_lieferschein') %} Die Lagerbewegungen werden sofort gebucht.{% endif %}">
       <button class="btn btn-primary" type="submit">Drucken/Buchen</button>
+    </form>
+    {% endif %}
+    {% if angebot_offen %}
+    <button class="btn btn-success" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/auftrag-erhalten-dialog"
+            hx-target="#angebot-dialog" hx-swap="innerHTML">Auftrag erhalten</button>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/auftrag-nicht-erhalten"
+          data-bestaetigen="Angebot {{ beleg.belegnr }} als „nicht erhalten“ erledigen?">
+      <button class="btn btn-outline-danger" type="submit">Auftrag nicht erhalten</button>
     </form>
     {% endif %}
     {% if beleg.status == 'gedruckt' %}
@@ -44,8 +63,14 @@
     </form>
     {% endif %}
     <form method="post" action="/belege/detail/{{ beleg.id }}/duplizieren">
-      <button class="btn btn-outline-secondary" type="submit">Duplizieren</button>
+      <button class="btn btn-outline-secondary" type="submit">Kopieren</button>
     </form>
+    {% if loeschbar %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/loeschen"
+          data-bestaetigen="{{ label }} {{ beleg.belegnr }} wirklich löschen? Das lässt sich nicht rückgängig machen.">
+      <button class="btn btn-outline-danger" type="submit">Löschen</button>
+    </form>
+    {% endif %}
     {% if zahlbar %}
     {% if beleg.bezahlt_am %}
     <form method="post" action="/belege/detail/{{ beleg.id }}/offen">
@@ -76,96 +101,146 @@
 <div class="alert alert-info">Beleg ist gebucht und unveränderlich.</div>
 {% endif %}
 
-<form method="post" action="/belege/detail/{{ beleg.id }}/kopf" class="row g-3 mb-4">
-  <div class="col-md-4">
-    <label class="form-label">Adresse</label>
-    <input class="form-control" value="{{ adresse.firma if adresse else '' }}" disabled>
+{# Dialoge (Folgebeleg, Abschlag, Auftrag erhalten) liegen über den Reitern.
+   ?dialog=folgebeleg|abschlag öffnet den Dialog direkt (aus der Übersicht). #}
+<div id="angebot-dialog"></div>
+<div id="folgebeleg-dialog"
+     {% if dialog_auto == 'folgebeleg' and folgebeleg_moeglich %}hx-get="/belege/detail/{{ beleg.id }}/folgebeleg-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+<div id="abschlag-dialog"
+     {% if dialog_auto == 'abschlag' and beleg.belegart == 'auftrag' and beleg.status in ('gedruckt', 'erledigt') %}hx-get="/belege/detail/{{ beleg.id }}/abschlag-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+
+{# Kplus-Aufteilung: Kopfdaten und Positionen als getrennte Reiter #}
+<ul class="nav nav-tabs mb-3" role="tablist" id="beleg-reiter">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if aktiver_tab == 'kopf' %}active{% endif %}" type="button" role="tab"
+            data-bs-toggle="tab" data-bs-target="#reiter-kopf">Kopfdaten</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if aktiver_tab == 'positionen' %}active{% endif %}" type="button" role="tab"
+            data-bs-toggle="tab" data-bs-target="#reiter-positionen">Positionen
+      <span class="badge rounded-pill text-bg-secondary ms-1">{{ positionen | length }}</span></button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  {# ------------------------------------------------------------- Kopfdaten #}
+  <div class="tab-pane fade {% if aktiver_tab == 'kopf' %}show active{% endif %}" id="reiter-kopf" role="tabpanel">
+    <form method="post" action="/belege/detail/{{ beleg.id }}/kopf" class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label">Adresse</label>
+        <input class="form-control" value="{{ adresse.firma if adresse else '' }}" disabled>
+        {% if adresse %}<div class="form-text"><a href="/adressen/{{ adresse.id }}">Adresse aufrufen</a></div>{% endif %}
+      </div>
+      <div class="col-md-8">
+        <label class="form-label" for="betreff">Betreff</label>
+        <input class="form-control" type="text" name="betreff" id="betreff" maxlength="200"
+               value="{{ beleg.betreff }}" {% if not bearbeitbar %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="datum">Datum</label>
+        <input class="form-control" type="date" name="datum" id="datum"
+               value="{{ beleg.datum.isoformat() }}" {% if not bearbeitbar %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="termin">Termin</label>
+        <input class="form-control" type="date" name="termin" id="termin"
+               value="{{ beleg.termin.isoformat() if beleg.termin else '' }}" {% if not bearbeitbar %}disabled{% endif %}>
+      </div>
+      {% if beleg.belegart == 'auftrag' %}
+      <div class="col-md-3">
+        <label class="form-label" for="auftragsart">Auftragsart</label>
+        <select class="form-select" name="auftragsart" id="auftragsart" {% if not bearbeitbar %}disabled{% endif %}>
+          <option value="">– keine –</option>
+          {% for a in auftragsarten %}
+          <option value="{{ a }}" {% if beleg.auftragsart == a %}selected{% endif %}>{{ auftragsart_labels[a] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      {% if beleg.belegart == 'rechnung' %}
+      <div class="col-md-2">
+        <label class="form-label" for="leistungsdatum_von">Leistungsdatum von</label>
+        <input class="form-control" type="date" name="leistungsdatum_von" id="leistungsdatum_von"
+               value="{{ beleg.leistungsdatum_von.isoformat() if beleg.leistungsdatum_von else '' }}"
+               {% if not bearbeitbar %}disabled{% endif %}>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="leistungsdatum_bis">Leistungsdatum bis</label>
+        <input class="form-control" type="date" name="leistungsdatum_bis" id="leistungsdatum_bis"
+               value="{{ beleg.leistungsdatum_bis.isoformat() if beleg.leistungsdatum_bis else '' }}"
+               {% if not bearbeitbar %}disabled{% endif %}>
+      </div>
+      {% endif %}
+      <div class="col-md-6">
+        <div class="d-flex justify-content-between align-items-center">
+          <label class="form-label" for="kopftext">Kopftext</label>
+          {% if bearbeitbar %}
+          <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+                  hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=kopf"
+                  hx-target="#tb-kopf" hx-swap="innerHTML">Textbaustein</button>
+          {% endif %}
+        </div>
+        <textarea class="form-control" name="kopftext" id="kopftext" rows="3"
+                  {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.kopftext }}</textarea>
+      </div>
+      <div class="col-md-6">
+        <div class="d-flex justify-content-between align-items-center">
+          <label class="form-label" for="fusstext">Fußtext</label>
+          {% if bearbeitbar %}
+          <button class="btn btn-sm btn-outline-secondary py-0" type="button"
+                  hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=fuss"
+                  hx-target="#tb-fuss" hx-swap="innerHTML">Textbaustein</button>
+          {% endif %}
+        </div>
+        <textarea class="form-control" name="fusstext" id="fusstext" rows="3"
+                  {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.fusstext }}</textarea>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-outline-primary" type="submit"
+                {% if not bearbeitbar %}disabled{% endif %}>Kopf speichern</button>
+        <button class="btn btn-outline-secondary" type="button"
+                data-bs-toggle="tab" data-bs-target="#reiter-positionen">Weiter zu den Positionen &rarr;</button>
+      </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6"><div id="tb-kopf"></div></div>
+      <div class="col-md-6"><div id="tb-fuss"></div></div>
+    </div>
   </div>
-  <div class="col-md-2">
-    <label class="form-label" for="datum">Datum</label>
-    <input class="form-control" type="date" name="datum" id="datum"
-           value="{{ beleg.datum.isoformat() }}" {% if not bearbeitbar %}disabled{% endif %}>
-  </div>
-  {% if beleg.belegart == 'rechnung' %}
-  <div class="col-md-2">
-    <label class="form-label" for="leistungsdatum_von">Leistungsdatum von</label>
-    <input class="form-control" type="date" name="leistungsdatum_von" id="leistungsdatum_von"
-           value="{{ beleg.leistungsdatum_von.isoformat() if beleg.leistungsdatum_von else '' }}"
-           {% if not bearbeitbar %}disabled{% endif %}>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label" for="leistungsdatum_bis">Leistungsdatum bis</label>
-    <input class="form-control" type="date" name="leistungsdatum_bis" id="leistungsdatum_bis"
-           value="{{ beleg.leistungsdatum_bis.isoformat() if beleg.leistungsdatum_bis else '' }}"
-           {% if not bearbeitbar %}disabled{% endif %}>
-  </div>
-  {% endif %}
-  <div class="col-md-6">
-    <div class="d-flex justify-content-between align-items-center">
-      <label class="form-label" for="kopftext">Kopftext</label>
+
+  {# ------------------------------------------------------------ Positionen #}
+  <div class="tab-pane fade {% if aktiver_tab == 'positionen' %}show active{% endif %}" id="reiter-positionen" role="tabpanel">
+    {% if zeiten_sichtbar and zeiten %}
+    {% include "partials/beleg_zeiten.html" %}
+    {% endif %}
+
+    {% include "partials/positionsgrid.html" %}
+
+    <div id="position-detail">
       {% if bearbeitbar %}
-      <button class="btn btn-sm btn-outline-secondary py-0" type="button"
-              hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=kopf"
-              hx-target="#tb-kopf" hx-swap="innerHTML">Textbaustein</button>
+      <div class="text-muted small mb-3">
+        Wähle eine Position aus dem Grid, um Details und Kalkulation zu bearbeiten.
+      </div>
       {% endif %}
     </div>
-    <textarea class="form-control" name="kopftext" id="kopftext" rows="2"
-              {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.kopftext }}</textarea>
-  </div>
-  <div class="col-md-6">
-    <div class="d-flex justify-content-between align-items-center">
-      <label class="form-label" for="fusstext">Fußtext</label>
-      {% if bearbeitbar %}
-      <button class="btn btn-sm btn-outline-secondary py-0" type="button"
-              hx-get="/belege/detail/{{ beleg.id }}/textbausteine?ziel=fuss"
-              hx-target="#tb-fuss" hx-swap="innerHTML">Textbaustein</button>
-      {% endif %}
+
+    {% if bearbeitbar %}
+    <div class="row mt-3 g-2 align-items-start">
+      <div class="col-md-5 position-relative">
+        <input class="form-control" type="search" name="q" placeholder="Artikel suchen (Nr oder Bezeichnung) …"
+               hx-get="/belege/detail/{{ beleg.id }}/artikelsuche"
+               hx-trigger="input changed delay:300ms" hx-target="#artikel-treffer">
+        <div id="artikel-treffer"></div>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-outline-secondary" type="button"
+                hx-post="/belege/detail/{{ beleg.id }}/positionen"
+                hx-target="#positionsbereich" hx-swap="outerHTML">Freie Position</button>
+      </div>
     </div>
-    <textarea class="form-control" name="fusstext" id="fusstext" rows="2"
-              {% if not bearbeitbar %}disabled{% endif %}>{{ beleg.fusstext }}</textarea>
-  </div>
-  <div class="col-12">
-    <button class="btn btn-outline-primary" type="submit"
-            {% if not bearbeitbar %}disabled{% endif %}>Kopf speichern</button>
-  </div>
-</form>
-
-<div class="row g-3 mb-3">
-  <div class="col-md-6"><div id="tb-kopf"></div></div>
-  <div class="col-md-6"><div id="tb-fuss"></div></div>
-</div>
-
-<div id="folgebeleg-dialog"></div>
-<div id="abschlag-dialog"></div>
-
-{% if zeiten_sichtbar and zeiten %}
-{% include "partials/beleg_zeiten.html" %}
-{% endif %}
-
-{% include "partials/positionsgrid.html" %}
-
-<div id="position-detail">
-  {% if bearbeitbar %}
-  <div class="text-muted small mb-3">
-    Wähle eine Position aus dem Grid, um Details und Kalkulation zu bearbeiten.
-  </div>
-  {% endif %}
-</div>
-
-{% if bearbeitbar %}
-<div class="row mt-3 g-2 align-items-start">
-  <div class="col-md-5 position-relative">
-    <input class="form-control" type="search" name="q" placeholder="Artikel suchen (Nr oder Bezeichnung) …"
-           hx-get="/belege/detail/{{ beleg.id }}/artikelsuche"
-           hx-trigger="input changed delay:300ms" hx-target="#artikel-treffer">
-    <div id="artikel-treffer"></div>
-  </div>
-  <div class="col-auto">
-    <button class="btn btn-outline-secondary" type="button"
-            hx-post="/belege/detail/{{ beleg.id }}/positionen"
-            hx-target="#positionsbereich" hx-swap="outerHTML">Freie Position</button>
+    {% endif %}
   </div>
 </div>
-{% endif %}
 <script src="/static/beleg-editor.js" defer></script>
 {% endblock %}

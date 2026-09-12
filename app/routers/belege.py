@@ -6,7 +6,7 @@ app.services.beleg_service; hier passiert nur Formular-Parsing und Rendering.
 
 from datetime import date, timedelta
 from decimal import Decimal
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -22,10 +22,13 @@ from app.formparse import (
     parse_prozent,
 )
 from app.models import (
+    AUFTRAGSART_LABELS,
     UST_SAETZE,
     Adresse,
     AdressTyp,
+    Angebotsergebnis,
     Artikel,
+    Auftragsart,
     Beleg,
     Belegart,
     BelegPosition,
@@ -116,6 +119,60 @@ VERKAUFSARTEN = {
 
 # Belegarten mit Zahlungsstatus (offene Posten)
 ZAHLUNGSARTEN = {Belegart.RECHNUNG, Belegart.GUTSCHRIFT, Belegart.EK_RECHNUNG}
+
+# ------------------------------------------------ Kplus-Belegübersicht (VK/EK)
+# Zwei Übersichtsseiten mit einem Reiter je Belegart — so, wie der Anwender es
+# aus Kplus kennt ("Belegübersicht VK" / "Belegübersicht EK").
+UEBERSICHT_TABS: dict[str, list[Belegart]] = {
+    "vk": [
+        Belegart.ANGEBOT,
+        Belegart.AUFTRAG,
+        Belegart.LIEFERSCHEIN,
+        Belegart.RECHNUNG,
+        Belegart.GUTSCHRIFT,
+    ],
+    "ek": [Belegart.BESTELLUNG, Belegart.EK_LIEFERSCHEIN, Belegart.EK_RECHNUNG],
+}
+UEBERSICHT_TITEL = {"vk": "Belegübersicht VK", "ek": "Belegübersicht EK"}
+UEBERSICHT_BEREICH = {"vk": "verkauf", "ek": "einkauf"}
+TAB_LABELS: dict[Belegart, str] = {
+    Belegart.ANGEBOT: "Angebot",
+    Belegart.AUFTRAG: "Auftrag",
+    Belegart.LIEFERSCHEIN: "Lieferschein",
+    Belegart.RECHNUNG: "Rechnung",
+    Belegart.GUTSCHRIFT: "Gutschrift",
+    Belegart.BESTELLUNG: "Bestellung",
+    Belegart.EK_LIEFERSCHEIN: "Eingangslieferschein",
+    Belegart.EK_RECHNUNG: "Eingangsrechnung",
+}
+# Statusfilter wie in Kplus: Alle / unerledigte / erledigte / nicht gedruckte
+UEBERSICHT_STATUS: dict[str, str] = {
+    "alle": "Alle",
+    "unerledigt": "Unerledigte",
+    "erledigt": "Erledigte",
+    "nicht_gedruckt": "Nicht gedruckte",
+    "storniert": "Stornierte",
+}
+ANGEBOTSERGEBNIS_LABELS: dict[str, str] = {
+    "": "",
+    Angebotsergebnis.ERHALTEN: "Auftrag erhalten",
+    Angebotsergebnis.NICHT_ERHALTEN: "Nicht erhalten",
+}
+
+
+def uebersicht_url(belegart: Belegart | str) -> str:
+    """Übersichtsseite (mit passendem Reiter) für eine Belegart."""
+    art = Belegart(belegart)
+    bereich = "vk" if art in VERKAUFSARTEN else "ek"
+    return f"/belege/uebersicht/{bereich}?art={art}"
+
+
+def _parse_auftragsart(wert: str, belegart: Belegart) -> str:
+    """Auftragsart nur am Auftrag; unbekannte Werte werden zu "" (keine 422-Falle)."""
+    if belegart != Belegart.AUFTRAG:
+        return ""
+    wert = (wert or "").strip()
+    return wert if wert in set(Auftragsart) else ""
 
 
 ZAHLSTATUS_BADGES: dict[str, str] = {
@@ -474,15 +531,358 @@ def _zeiten_kontext(request: Request, session: Session, beleg: Beleg) -> dict:
     }
 
 
+# ------------------------------------------------- Kplus: Belegübersicht VK / EK
+
+
+def _uebersicht_bereich_oder_404(bereich: str, request: Request, session: Session) -> str:
+    if bereich not in UEBERSICHT_TABS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unbekannte Übersicht")
+    _pruefe_recht(request, session, UEBERSICHT_BEREICH[bereich], Zugriff.ANSEHEN)
+    return bereich
+
+
+def _uebersicht_art(bereich: str, art: str) -> Belegart:
+    """Reiter der Übersicht; unbekannt/leer → erster Reiter (kein 404, kein 422)."""
+    try:
+        gewaehlt = Belegart(art)
+    except ValueError:
+        return UEBERSICHT_TABS[bereich][0]
+    if gewaehlt not in UEBERSICHT_TABS[bereich]:
+        return UEBERSICHT_TABS[bereich][0]
+    return gewaehlt
+
+
+def _uebersicht_datum(text: str) -> date | None:
+    """Datumsfilter tolerant parsen: leer oder ungültig → kein Filter."""
+    try:
+        return _parse_datum(text)
+    except HTTPException:
+        return None
+
+
+def _uebersicht_kontext(  # noqa: PLR0913
+    request: Request,
+    session: Session,
+    bereich: str,
+    art: Belegart,
+    q: str,
+    status_filter: str,
+    von: str,
+    bis: str,
+    nur_eigene: bool,
+    auftragsart: str,
+    seite: int,
+    benutzer: Benutzer,
+) -> dict:
+    """Gemeinsamer Kontext für Übersichtsseite und HTMX-Zeilen-Partial.
+
+    Filter wie in Kplus: Suchbegriff (Nummer/Name/Betreff), Datum von/bis,
+    Status-Radiogruppe, „nur eigene Belege", Auftragsart (nur Auftrags-Reiter).
+    Die Summenzeile zeigt die Bruttosumme ALLER Treffer (nicht nur der Seite).
+    """
+    if status_filter not in UEBERSICHT_STATUS:
+        status_filter = "alle"
+    auftragsart = _parse_auftragsart(auftragsart, art)
+    von_datum, bis_datum = _uebersicht_datum(von), _uebersicht_datum(bis)
+
+    bedingungen = [Beleg.belegart == art]
+    if status_filter == "unerledigt":
+        bedingungen.append(
+            Beleg.status.in_([BelegStatus.ENTWURF, BelegStatus.GEDRUCKT])  # type: ignore[attr-defined]
+        )
+    elif status_filter == "erledigt":
+        bedingungen.append(Beleg.status == BelegStatus.ERLEDIGT)
+    elif status_filter == "nicht_gedruckt":
+        bedingungen.append(Beleg.status == BelegStatus.ENTWURF)
+    elif status_filter == "storniert":
+        bedingungen.append(Beleg.status == BelegStatus.STORNIERT)
+    if q.strip():
+        muster = f"%{q.strip()}%"
+        bedingungen.append(
+            Beleg.belegnr.ilike(muster)  # type: ignore[attr-defined]
+            | Adresse.firma.ilike(muster)  # type: ignore[attr-defined]
+            | Beleg.betreff.ilike(muster)  # type: ignore[attr-defined]
+        )
+    if von_datum is not None:
+        bedingungen.append(Beleg.datum >= von_datum)
+    if bis_datum is not None:
+        bedingungen.append(Beleg.datum <= bis_datum)
+    if nur_eigene:
+        bedingungen.append(Beleg.erstellt_von == benutzer.id)
+    if auftragsart:
+        bedingungen.append(Beleg.auftragsart == auftragsart)
+
+    stmt = (
+        select(Beleg, Adresse)
+        .join(Adresse, Beleg.adresse_id == Adresse.id)  # type: ignore[arg-type]
+        .where(*bedingungen)
+        .order_by(Beleg.id.desc())  # type: ignore[union-attr]
+    )
+    params = {
+        "art": str(art),
+        "q": q,
+        "status_filter": status_filter,
+        "von": von,
+        "bis": bis,
+        "nur_eigene": "1" if nur_eigene else "",
+        "auftragsart": auftragsart,
+    }
+    belege, pag = blaettere(
+        session,
+        stmt,
+        seite,
+        groesse=SEITENGROESSE,
+        basis_url=f"/belege/uebersicht/{bereich}",
+        params=params,
+        htmx_url=f"/belege/uebersicht/{bereich}/zeilen",
+        htmx_target="#uebersicht-body",
+    )
+
+    # Gesamtsumme aller Treffer (Kplus: "Summe ... von ..."); TEXT-Spalte →
+    # exakt in Python summieren statt als REAL in SQLite.
+    summen_stmt = (
+        select(Beleg.summe_brutto)
+        .join(Adresse, Beleg.adresse_id == Adresse.id)  # type: ignore[arg-type]
+        .where(*bedingungen)
+    )
+    gesamt_summe = sum((Decimal(w) for w in session.exec(summen_stmt).all()), Decimal("0"))
+
+    beleg_ids = [b.id for b, _ in belege]
+    nachfolger: dict[int, list[Beleg]] = {}
+    ersteller: dict[int, str] = {}
+    if beleg_ids:
+        for folge in session.exec(
+            select(Beleg).where(Beleg.vorgaenger_beleg_id.in_(beleg_ids))  # type: ignore[attr-defined]
+        ).all():
+            nachfolger.setdefault(folge.vorgaenger_beleg_id, []).append(folge)
+        benutzer_ids = {b.erstellt_von for b, _ in belege if b.erstellt_von is not None}
+        if benutzer_ids:
+            ersteller = {
+                bn.id: bn.name
+                for bn in session.exec(
+                    select(Benutzer).where(Benutzer.id.in_(benutzer_ids))  # type: ignore[attr-defined]
+                ).all()
+            }
+
+    filter_query = urlencode({k: v for k, v in params.items() if v and k != "art"})
+    return {
+        "bereich": bereich,
+        "titel": UEBERSICHT_TITEL[bereich],
+        "tabs": [(a, TAB_LABELS[a]) for a in UEBERSICHT_TABS[bereich]],
+        "art": art,
+        "label": BELEGART_LABELS[art],
+        "belege": belege,
+        "pag": pag,
+        "gesamt_summe": gesamt_summe,
+        "q": q,
+        "status_filter": status_filter,
+        "status_optionen": UEBERSICHT_STATUS,
+        "von": von,
+        "bis": bis,
+        "nur_eigene": nur_eigene,
+        "auftragsart": auftragsart,
+        "auftragsart_labels": AUFTRAGSART_LABELS,
+        "auftragsarten": list(Auftragsart),
+        "angebotsergebnis_labels": ANGEBOTSERGEBNIS_LABELS,
+        "status_labels": STATUS_LABELS,
+        "nachfolger": nachfolger,
+        "ersteller": ersteller,
+        "zahlungsrelevant": art in ZAHLUNGSARTEN,
+        "zahlung_map": _zahlung_map(belege, art),
+        "zahlstatus_badges": ZAHLSTATUS_BADGES,
+        "zahlstatus_labels": ZAHLSTATUS_LABELS,
+        "filter_query": filter_query,
+        "gefiltert": bool(q.strip())
+        or status_filter != "alle"
+        or bool(von)
+        or bool(bis)
+        or nur_eigene
+        or bool(auftragsart),
+        "folgebeleg_ziel": beleg_service.FOLGEBELEGART.get(art),
+        "folgebeleg_ziel_label": BELEGART_LABELS.get(beleg_service.FOLGEBELEGART.get(art), ""),
+        "ist_admin": benutzer.rolle == Rolle.ADMIN,
+        "darf_bearbeiten": _hat_recht(
+            request, session, UEBERSICHT_BEREICH[bereich], Zugriff.BEARBEITEN
+        ),
+        "nav_aktiv": f"/belege/uebersicht/{bereich}",
+    }
+
+
+@router.get("/uebersicht/{bereich}")
+def uebersicht(  # noqa: PLR0913
+    request: Request,
+    bereich: str,
+    art: str = "",
+    q: str = "",
+    status_filter: str = "alle",
+    von: str = "",
+    bis: str = "",
+    nur_eigene: str = "",
+    auftragsart: str = "",
+    seite: int = 1,
+    fehler: str = "",
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus-Belegübersicht: ein Reiter je Belegart, Aktionsleiste, Summenzeile."""
+    bereich = _uebersicht_bereich_oder_404(bereich, request, session)
+    kontext = _uebersicht_kontext(
+        request, session, bereich, _uebersicht_art(bereich, art), q, status_filter,
+        von, bis, bool(nur_eigene), auftragsart, seite, benutzer,
+    )
+    kontext["fehler"] = fehler
+    return templates.TemplateResponse(request, "belege/uebersicht.html", kontext)
+
+
+@router.get("/uebersicht/{bereich}/zeilen")
+def uebersicht_zeilen(  # noqa: PLR0913
+    request: Request,
+    bereich: str,
+    art: str = "",
+    q: str = "",
+    status_filter: str = "alle",
+    von: str = "",
+    bis: str = "",
+    nur_eigene: str = "",
+    auftragsart: str = "",
+    seite: int = 1,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """HTMX-Partial: Tabelle + Summenzeile + Blätterwerk der Übersicht."""
+    bereich = _uebersicht_bereich_oder_404(bereich, request, session)
+    kontext = _uebersicht_kontext(
+        request, session, bereich, _uebersicht_art(bereich, art), q, status_filter,
+        von, bis, bool(nur_eigene), auftragsart, seite, benutzer,
+    )
+    return templates.TemplateResponse(request, "partials/uebersicht_zeilen.html", kontext)
+
+
+# ------------------------------------------- Kplus: Auftrag erhalten / nicht erhalten
+
+
+def _zurueck_url(zurueck: str, beleg: Beleg, fehler: str | None = None) -> str:
+    """Ziel nach einer Aktion: Übersicht (wenn von dort gekommen) sonst Editor."""
+    if zurueck and zurueck.startswith("/belege/uebersicht/"):
+        url = zurueck
+        if fehler:
+            url += ("&" if "?" in url else "?") + "fehler=" + quote(fehler)
+        return url
+    url = f"/belege/detail/{beleg.id}"
+    if fehler:
+        url += f"?fehler={quote(fehler)}"
+    return url
+
+
+@router.get("/detail/{beleg_id}/auftrag-erhalten-dialog")
+def auftrag_erhalten_dialog(
+    request: Request,
+    beleg_id: int,
+    zurueck: str = "",
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """HTMX-Partial: Auftragsart + Termin wählen, dann Auftrag erzeugen."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    if not beleg_service.angebot_ist_offen(beleg):
+        return _meldung(
+            request, "Nur für offene Angebote möglich", status.HTTP_409_CONFLICT
+        )
+    return templates.TemplateResponse(
+        request,
+        "partials/auftrag_erhalten_dialog.html",
+        {
+            "beleg": beleg,
+            "auftragsarten": list(Auftragsart),
+            "auftragsart_labels": AUFTRAGSART_LABELS,
+            "zurueck": zurueck,
+        },
+    )
+
+
+@router.post("/detail/{beleg_id}/auftrag-erhalten")
+def auftrag_erhalten(  # noqa: PLR0913
+    request: Request,
+    beleg_id: int,
+    auftragsart: str = Form(""),
+    termin: str = Form(""),
+    zurueck: str = Form(""),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Auftrag erhalten": Auftrag als Folgebeleg, Angebot erledigt."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    try:
+        auftrag = beleg_service.angebot_erhalten(
+            session,
+            beleg,
+            benutzer_id=benutzer.id,
+            auftragsart=_parse_auftragsart(auftragsart, Belegart.AUFTRAG),
+            termin=_parse_datum(termin),
+        )
+    except (UngueltigeBelegart, UngueltigerStatusUebergang, WerkplusFehler) as exc:
+        session.rollback()
+        return RedirectResponse(
+            _zurueck_url(zurueck, beleg, fehler=str(exc)), status_code=status.HTTP_302_FOUND
+        )
+    session.commit()
+    return _editor_redirect(auftrag.id)
+
+
+@router.post("/detail/{beleg_id}/auftrag-nicht-erhalten")
+def auftrag_nicht_erhalten(
+    request: Request,
+    beleg_id: int,
+    zurueck: str = Form(""),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Auftrag nicht erhalten": Angebot als verloren erledigen."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    try:
+        beleg_service.angebot_nicht_erhalten(session, beleg)
+    except (UngueltigeBelegart, UngueltigerStatusUebergang) as exc:
+        session.rollback()
+        return RedirectResponse(
+            _zurueck_url(zurueck, beleg, fehler=str(exc)), status_code=status.HTTP_302_FOUND
+        )
+    session.commit()
+    return RedirectResponse(_zurueck_url(zurueck, beleg), status_code=status.HTTP_302_FOUND)
+
+
+@router.post("/detail/{beleg_id}/loeschen")
+def beleg_loeschen(
+    request: Request,
+    beleg_id: int,
+    zurueck: str = Form(""),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Beleg löschen" — nur Entwürfe; gebuchte Belege werden storniert."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    ziel = zurueck if zurueck.startswith("/belege/uebersicht/") else uebersicht_url(beleg.belegart)
+    try:
+        beleg_service.loesche_entwurf(session, beleg)
+    except BelegGesperrt as exc:
+        session.rollback()
+        return RedirectResponse(
+            _zurueck_url(zurueck, beleg, fehler=str(exc)), status_code=status.HTTP_302_FOUND
+        )
+    session.commit()
+    return RedirectResponse(ziel, status_code=status.HTTP_302_FOUND)
+
+
 # ---------------------------------------------------------------- Liste + Anlage
 
 
 @router.get("/detail/{beleg_id}")
-def beleg_editor(
+def beleg_editor(  # noqa: PLR0913
     request: Request,
     beleg_id: int,
     fehler: str = "",
     gebucht: str = "",
+    tab: str = "",
+    dialog: str = "",
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -518,6 +918,16 @@ def beleg_editor(
             and beleg.status in (BelegStatus.GEDRUCKT, BelegStatus.ERLEDIGT),
             "zahlstatus_badges": ZAHLSTATUS_BADGES,
             "zahlstatus_labels": ZAHLSTATUS_LABELS,
+            # Kplus-Kopf: Reiter Kopfdaten/Positionen, Auftragsart, Angebotsausgang
+            "aktiver_tab": "positionen" if tab == "positionen" else "kopf",
+            "dialog_auto": dialog,
+            "auftragsart_labels": AUFTRAGSART_LABELS,
+            "auftragsarten": list(Auftragsart),
+            "angebot_offen": beleg_service.angebot_ist_offen(beleg),
+            "angebotsergebnis_label": ANGEBOTSERGEBNIS_LABELS.get(beleg.angebotsergebnis, ""),
+            "uebersicht_url": uebersicht_url(beleg.belegart),
+            "nav_aktiv": f"/belege/uebersicht/{'vk' if beleg.belegart in VERKAUFSARTEN else 'ek'}",
+            "loeschbar": beleg.status == BelegStatus.ENTWURF,
         }
     )
     kontext.update(_zeiten_kontext(request, session, beleg))
@@ -977,6 +1387,9 @@ def kopf_speichern(  # noqa: PLR0913
     datum: str = Form(""),
     leistungsdatum_von: str = Form(""),
     leistungsdatum_bis: str = Form(""),
+    betreff: str = Form(""),
+    termin: str = Form(""),
+    auftragsart: str = Form(""),
     kopftext: str = Form(""),
     fusstext: str = Form(""),
     benutzer: Benutzer = Depends(get_current_user),
@@ -992,6 +1405,9 @@ def kopf_speichern(  # noqa: PLR0913
         beleg.datum = neues_datum
     beleg.leistungsdatum_von = _parse_datum(leistungsdatum_von)
     beleg.leistungsdatum_bis = _parse_datum(leistungsdatum_bis)
+    beleg.betreff = betreff.strip()
+    beleg.termin = _parse_datum(termin)
+    beleg.auftragsart = _parse_auftragsart(auftragsart, beleg.belegart)
     beleg.kopftext = kopftext.strip()
     beleg.fusstext = fusstext.strip()
     session.add(beleg)
@@ -1431,6 +1847,10 @@ def beleg_neu_form(
             "label": BELEGART_LABELS[art],
             "adressen": _adressen_fuer_belegart(session, art),
             "heute": date.today(),
+            "auftragsart_labels": AUFTRAGSART_LABELS,
+            "auftragsarten": list(Auftragsart),
+            "uebersicht_url": uebersicht_url(art),
+            "nav_aktiv": f"/belege/uebersicht/{'vk' if art in VERKAUFSARTEN else 'ek'}",
         },
     )
 
@@ -1441,6 +1861,9 @@ def beleg_neu(
     belegart: str,
     adresse_id: int = Form(...),
     datum: str = Form(""),
+    betreff: str = Form(""),
+    termin: str = Form(""),
+    auftragsart: str = Form(""),
     kopftext: str = Form(""),
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
@@ -1449,7 +1872,12 @@ def beleg_neu(
     adresse = session.get(Adresse, adresse_id)
     if adresse is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adresse nicht gefunden")
-    kopf: dict = {"kopftext": kopftext.strip()}
+    kopf: dict = {
+        "kopftext": kopftext.strip(),
+        "betreff": betreff.strip(),
+        "termin": _parse_datum(termin),
+        "auftragsart": _parse_auftragsart(auftragsart, art),
+    }
     beleg_datum = _parse_datum(datum)
     if beleg_datum is not None:
         kopf["datum"] = beleg_datum

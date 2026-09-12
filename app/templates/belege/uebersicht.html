@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}{{ titel }}{% endblock %}
+{% block content %}
+{# Kplus-Belegübersicht: Reiter je Belegart, Aktionsleiste links, Filter unten,
+   Summenzeile. Zeile anklicken = markieren (Strg = mehrere), Doppelklick oder
+   Enter = Beleg öffnen. Die Aktionen wirken auf den zuletzt markierten Beleg. #}
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h1 class="h3 mb-0">{{ titel }}</h1>
+  {% if darf_bearbeiten %}
+  <a class="btn btn-primary" href="/belege/{{ art }}/neu">Neu: {{ label }}</a>
+  {% endif %}
+</div>
+
+{% if fehler %}
+<div class="alert alert-danger">{{ fehler }}</div>
+{% endif %}
+
+<ul class="nav nav-tabs wp-ueb-tabs mb-3" role="tablist">
+  {% for tab_art, tab_label in tabs %}
+  <li class="nav-item">
+    <a class="nav-link {% if tab_art == art %}active{% endif %}"
+       href="/belege/uebersicht/{{ bereich }}?art={{ tab_art }}{% if filter_query %}&{{ filter_query }}{% endif %}">{{ tab_label }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="wp-ueb-layout" id="ueb"
+     data-art="{{ art }}"
+     data-zurueck="/belege/uebersicht/{{ bereich }}?art={{ art }}{% if filter_query %}&{{ filter_query }}{% endif %}">
+
+  {# --------------------------------------------------- Aktionsleiste (Kplus) #}
+  <aside class="wp-ueb-aktionen card" id="ueb-aktionen" aria-label="Belegaktionen">
+    <div class="wp-ueb-aktionen-titel">Beleg</div>
+    <a class="wp-aktion" data-aktion="kopf" data-url="/belege/detail/{id}?tab=kopf" href="#" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16"/></svg>Belegkopf aufrufen
+    </a>
+    <a class="wp-aktion" data-aktion="positionen" data-url="/belege/detail/{id}?tab=positionen" href="#" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Positionen aufrufen
+    </a>
+    <a class="wp-aktion" data-aktion="drucken" data-url="/belege/detail/{id}/pdf" href="#" target="_blank" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M6 14h12v7H6z"/></svg>Beleg drucken
+    </a>
+    <a class="wp-aktion" data-aktion="vorschau" data-url="/belege/detail/{id}/druckvorschau" href="#" target="_blank" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/></svg>Druckvorschau
+    </a>
+
+    {% if darf_bearbeiten %}
+    <div class="wp-ueb-aktionen-titel">Bearbeiten</div>
+    <a class="wp-aktion" href="/belege/{{ art }}/neu">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Neu: {{ label }}
+    </a>
+    <form method="post" data-aktion="kopieren" data-url="/belege/detail/{id}/duplizieren">
+      <button class="wp-aktion" type="submit" disabled>
+        <svg viewBox="0 0 24 24"><path d="M8 8h12v12H8zM4 16V4h12"/></svg>Beleg kopieren
+      </button>
+    </form>
+    <form method="post" data-aktion="loeschen" data-url="/belege/detail/{id}/loeschen"
+          data-bestaetigen="Beleg wirklich löschen? Nur Entwürfe lassen sich löschen; das lässt sich nicht rückgängig machen.">
+      <input type="hidden" name="zurueck" value="/belege/uebersicht/{{ bereich }}?art={{ art }}{% if filter_query %}&{{ filter_query }}{% endif %}">
+      <button class="wp-aktion wp-aktion-gefahr" type="submit" disabled>
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Beleg löschen
+      </button>
+    </form>
+
+    <div class="wp-ueb-aktionen-titel">Weiter</div>
+    {% if art == 'angebot' %}
+    <button class="wp-aktion" type="button" data-aktion="auftrag-erhalten"
+            data-url="/belege/detail/{id}/auftrag-erhalten-dialog" disabled>
+      <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>Auftrag erhalten
+    </button>
+    <form method="post" data-aktion="auftrag-nicht-erhalten" data-url="/belege/detail/{id}/auftrag-nicht-erhalten"
+          data-bestaetigen="Angebot als „nicht erhalten“ erledigen?">
+      <input type="hidden" name="zurueck" value="/belege/uebersicht/{{ bereich }}?art={{ art }}{% if filter_query %}&{{ filter_query }}{% endif %}">
+      <button class="wp-aktion" type="submit" disabled>
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Auftrag nicht erhalten
+      </button>
+    </form>
+    {% elif folgebeleg_ziel %}
+    <a class="wp-aktion" data-aktion="folgebeleg" data-url="/belege/detail/{id}?dialog=folgebeleg" href="#" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>{{ folgebeleg_ziel_label }} erstellen
+    </a>
+    {% endif %}
+    {% if art == 'auftrag' %}
+    <a class="wp-aktion" data-aktion="abschlag" data-url="/belege/detail/{id}?dialog=abschlag" href="#" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Abschlagsrechnung
+    </a>
+    {% endif %}
+    {% if art == 'lieferschein' %}
+    <a class="wp-aktion" href="/belege/lieferschein">
+      <svg viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Sammelrechnung …
+    </a>
+    {% endif %}
+    <form method="post" data-aktion="erledigt" data-url="/belege/detail/{id}/status/erledigt">
+      <button class="wp-aktion" type="submit" disabled>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>Status: erledigt
+      </button>
+    </form>
+    {% endif %}
+
+    <div class="wp-ueb-aktionen-titel">Sonstiges</div>
+    <a class="wp-aktion" data-aktion="adresse" data-url="/adressen/{adresse_id}" href="#" aria-disabled="true">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M17 11a3 3 0 100-6"/></svg>Adresse aufrufen
+    </a>
+  </aside>
+
+  {# ------------------------------------------------------- Tabelle + Filter #}
+  <div class="wp-ueb-main">
+    <div id="ueb-dialog"></div>
+
+    <form id="ueb-filter" class="card wp-ueb-filter" method="get" action="/belege/uebersicht/{{ bereich }}"
+          hx-get="/belege/uebersicht/{{ bereich }}/zeilen" hx-trigger="change"
+          hx-target="#uebersicht-body" hx-swap="innerHTML">
+      <input type="hidden" name="art" value="{{ art }}">
+      <div class="wp-ueb-filter-feld wp-ueb-filter-suche">
+        <label class="form-label" for="ueb-q">Suchbegriff</label>
+        <input class="form-control form-control-sm" type="search" id="ueb-q" name="q" value="{{ q }}"
+               placeholder="Nummer, Name, Betreff …"
+               hx-get="/belege/uebersicht/{{ bereich }}/zeilen" hx-trigger="input changed delay:300ms"
+               hx-include="#ueb-filter" hx-target="#uebersicht-body" hx-swap="innerHTML" autofocus>
+      </div>
+      <div class="wp-ueb-filter-feld">
+        <label class="form-label" for="ueb-von">Datum von</label>
+        <input class="form-control form-control-sm" type="date" id="ueb-von" name="von" value="{{ von }}">
+      </div>
+      <div class="wp-ueb-filter-feld">
+        <label class="form-label" for="ueb-bis">bis</label>
+        <input class="form-control form-control-sm" type="date" id="ueb-bis" name="bis" value="{{ bis }}">
+      </div>
+      <fieldset class="wp-ueb-filter-feld wp-ueb-status">
+        <legend class="form-label">Status</legend>
+        <div class="d-flex flex-wrap">
+          {% for wert, text in status_optionen.items() %}
+          <label class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="radio" name="status_filter" value="{{ wert }}"
+                   {% if status_filter == wert %}checked{% endif %}>
+            <span class="form-check-label">{{ text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      {% if art == 'auftrag' %}
+      <div class="wp-ueb-filter-feld">
+        <label class="form-label" for="ueb-auftragsart">Auftragsart</label>
+        <select class="form-select form-select-sm" id="ueb-auftragsart" name="auftragsart">
+          <option value="">Alle</option>
+          {% for a in auftragsarten %}
+          <option value="{{ a }}" {% if auftragsart == a %}selected{% endif %}>{{ auftragsart_labels[a] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="wp-ueb-filter-feld align-self-end">
+        <label class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" name="nur_eigene" value="1" {% if nur_eigene %}checked{% endif %}>
+          <span class="form-check-label">Nur eigene Belege</span>
+        </label>
+      </div>
+      <noscript><button class="btn btn-sm btn-outline-secondary" type="submit">Filtern</button></noscript>
+    </form>
+
+    <div class="card wp-ueb-card">
+      <div id="uebersicht-body">
+        {% include "partials/uebersicht_zeilen.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/static/uebersicht.js?v={{ asset_version() }}" defer></script>
+{% endblock %}

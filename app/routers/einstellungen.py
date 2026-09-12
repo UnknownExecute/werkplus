@@ -5,6 +5,8 @@ Oberfläche prüfbar ist, ob der neue Stand wirklich läuft.
 """
 
 import logging
+from datetime import date
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
@@ -14,8 +16,10 @@ from sqlmodel import Session
 from app.config import settings
 from app.database import get_session
 from app.dependencies import require_admin
-from app.models import Benutzer
-from app.services import firma_service
+from app.models import Belegart, Benutzer
+from app.routers.belege import BELEGART_LABELS
+from app.services import firma_service, nummernkreis_service
+from app.services.fehler import WerkplusFehler
 from app.templating import templates
 
 router = APIRouter(tags=["einstellungen"])
@@ -44,10 +48,29 @@ def _db_revision(session: Session) -> str:
         return str(wert)
 
 
+def _nummernkreis_kontext(session: Session, jahr: int) -> dict:
+    """Stände je Belegart für die Nummernkreis-Tabelle (Kplus-Anschluss)."""
+    staende = nummernkreis_service.staende(session, jahr)
+    return {
+        "nk_jahr": jahr,
+        "nk_zeilen": [
+            (
+                art,
+                BELEGART_LABELS[art],
+                staende[art],
+                nummernkreis_service.formatiere_belegnr(jahr, staende[art] + 1),
+            )
+            for art in Belegart
+        ],
+    }
+
+
 @router.get("/einstellungen")
-def einstellungen_form(
+def einstellungen_form(  # noqa: PLR0913
     request: Request,
     gespeichert: bool = False,
+    nk_gespeichert: bool = False,
+    nk_fehler: str = "",
     benutzer: Benutzer = Depends(require_admin),
     session: Session = Depends(get_session),
 ):
@@ -58,9 +81,48 @@ def einstellungen_form(
         {
             "firma": firma,
             "gespeichert": gespeichert,
+            "nk_gespeichert": nk_gespeichert,
+            "nk_fehler": nk_fehler,
             "umgebung": settings.env,
             "db_revision": _db_revision(session),
+            **_nummernkreis_kontext(session, date.today().year),
         },
+    )
+
+
+@router.post("/einstellungen/nummernkreise")
+async def nummernkreise_speichern(
+    request: Request,
+    benutzer: Benutzer = Depends(require_admin),
+    session: Session = Depends(get_session),
+):
+    """Nummernstände je Belegart setzen (nur nach oben — nahtloser Anschluss an Kplus).
+
+    Formularfelder ``stand_<belegart>`` = letzte vergebene Nummer; die nächste
+    Belegnummer ist dann Stand + 1. Leere Felder bleiben unverändert.
+    """
+    formular = await request.form()
+    jahr = date.today().year
+    try:
+        for art in Belegart:
+            wert = str(formular.get(f"stand_{art}", "")).strip()
+            if not wert:
+                continue
+            try:
+                stand = int(wert)
+            except ValueError:
+                raise WerkplusFehler(
+                    f"{BELEGART_LABELS[art]}: '{wert}' ist keine ganze Zahl"
+                ) from None
+            nummernkreis_service.setze_stand(session, art, jahr, stand)
+    except WerkplusFehler as exc:
+        session.rollback()
+        return RedirectResponse(
+            f"/einstellungen?nk_fehler={quote(str(exc))}", status_code=status.HTTP_303_SEE_OTHER
+        )
+    session.commit()
+    return RedirectResponse(
+        "/einstellungen?nk_gespeichert=1", status_code=status.HTTP_303_SEE_OTHER
     )
 
 

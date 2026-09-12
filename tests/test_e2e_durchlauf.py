@@ -76,7 +76,7 @@ def test_kompletter_durchlauf(session):
     beleg_service.fuege_position_hinzu(session, angebot, ventil, menge=Decimal("8"))
     beleg_service.fuege_position_hinzu(session, angebot, stunde, menge=Decimal("6"))
 
-    assert angebot.belegnr == f"AN-{jahr}-0001"
+    assert angebot.belegnr == f"{jahr % 100:02d}0001"
     # 1×2190.00 + 8×24.90 + 6×78.00 = 2857.20 netto, alles 20 % USt
     assert angebot.summe_netto == Decimal("2857.20")
     assert angebot.summe_ust == Decimal("571.44")
@@ -92,7 +92,7 @@ def test_kompletter_durchlauf(session):
     # ---------------------------------------------------------------- Auftrag
     auftrag = beleg_service.erzeuge_folgebeleg(session, angebot)
     assert auftrag.belegart == Belegart.AUFTRAG
-    assert auftrag.belegnr == f"AB-{jahr}-0001"
+    assert auftrag.belegnr == f"{jahr % 100:02d}0001"
     assert angebot.status == BelegStatus.ERLEDIGT
 
     angebot_positionen = _positionen(session, angebot)
@@ -107,7 +107,7 @@ def test_kompletter_durchlauf(session):
     # ------------------------------------------------------------ Lieferschein
     beleg_service.setze_status(session, auftrag, BelegStatus.GEDRUCKT)
     lieferschein = beleg_service.erzeuge_folgebeleg(session, auftrag)
-    assert lieferschein.belegnr == f"LS-{jahr}-0001"
+    assert lieferschein.belegnr == f"{jahr % 100:02d}0001"
     assert auftrag.status == BelegStatus.ERLEDIGT
     ls_id = lieferschein.id
     session.commit()  # Checkpoint vor dem fehlschlagenden Buchungsversuch
@@ -155,7 +155,7 @@ def test_kompletter_durchlauf(session):
 
     # ---------------------------------------------------------------- Rechnung
     rechnung = beleg_service.erzeuge_folgebeleg(session, lieferschein)
-    assert rechnung.belegnr == f"RE-{jahr}-0001"
+    assert rechnung.belegnr == f"{jahr % 100:02d}0001"
     assert rechnung.leistungsdatum_von == lieferschein.datum
     assert rechnung.leistungsdatum_bis == lieferschein.datum
     assert lieferschein.status == BelegStatus.ERLEDIGT
@@ -183,7 +183,7 @@ def test_kompletter_durchlauf(session):
     # --------------------------------------------------------------- Gutschrift
     gutschrift = beleg_service.erzeuge_folgebeleg(session, rechnung)
     assert gutschrift.belegart == Belegart.GUTSCHRIFT
-    assert gutschrift.belegnr == f"GS-{jahr}-0001"
+    assert gutschrift.belegnr == f"{jahr % 100:02d}0001"
     assert len(_positionen(session, gutschrift)) == 3
     assert rechnung.status == BelegStatus.ERLEDIGT
     session.commit()
@@ -191,7 +191,7 @@ def test_kompletter_durchlauf(session):
     # ------------------------------------------- Mini-Lieferschein: Storno-Fall
     bestand_vorher = lager_service.bestand(session, ventil.id)
     mini = beleg_service.erstelle_beleg(session, Belegart.LIEFERSCHEIN, kunde)
-    assert mini.belegnr == f"LS-{jahr}-0002"
+    assert mini.belegnr == f"{jahr % 100:02d}0002"
     beleg_service.fuege_position_hinzu(session, mini, ventil, menge=Decimal("1"))
     beleg_service.setze_status(session, mini, BelegStatus.GEDRUCKT)
     assert lager_service.bestand(session, ventil.id) == bestand_vorher - Decimal("1")

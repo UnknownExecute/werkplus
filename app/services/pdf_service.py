@@ -16,7 +16,13 @@ from sqlmodel import Session, select
 
 from app.models.adresse import Adresse
 from app.models.artikel import Artikel
-from app.models.beleg import Beleg, Belegart, BelegPosition, BelegPositionSeriennummer
+from app.models.beleg import (
+    AUFTRAGSART_LABELS,
+    Beleg,
+    Belegart,
+    BelegPosition,
+    BelegPositionSeriennummer,
+)
 from app.models.seriennummer import Seriennummer
 from app.services import firma_service
 from app.services.berechnung import parse_steuer_details, positions_netto
@@ -179,6 +185,7 @@ def _baue_kontext(session: Session, beleg: Beleg) -> dict:
         "summen": summen,
         "firma": firma_service.lade_firma(session),
         "belegart_label": BELEGART_LABEL[beleg.belegart],
+        "auftragsart_label": AUFTRAGSART_LABELS.get(beleg.auftragsart, ""),
         "faelligkeit": faelligkeit,
         "vorgaenger": vorgaenger,
     }

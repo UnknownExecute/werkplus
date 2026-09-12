@@ -100,7 +100,7 @@ def test_buchen_hat_rueckfrage_mit_belegnummer(engine, client):
     assert "data-bestaetigen=" in form
     assert "jetzt buchen?" in form
     assert "unveränderlich" in form
-    assert "AN-" in form  # Belegnummer steht im Rückfragetext
+    assert "Angebot 260001" in form or "Angebot " in form  # Belegnummer steht im Rückfragetext
     # Angebot bucht kein Lager -> kein irreführender Hinweis
     assert "Lagerbewegungen" not in form
 

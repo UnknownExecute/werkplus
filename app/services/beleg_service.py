@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 from app.models.adresse import Adresse
 from app.models.artikel import Artikel
 from app.models.beleg import (
+    Angebotsergebnis,
     Beleg,
     Belegart,
     BelegPosition,
@@ -324,6 +325,7 @@ def erzeuge_folgebeleg(
         datum=date.today(),
         vorgaenger_beleg_id=vorgaenger.id,
         zahlungsziel_tage=vorgaenger.zahlungsziel_tage,
+        betreff=vorgaenger.betreff,
         kopftext=vorgaenger.kopftext,
         fusstext=vorgaenger.fusstext,
         erstellt_von=benutzer_id,
@@ -400,6 +402,8 @@ def dupliziere_beleg(
         adresse_id=vorlage.adresse_id,
         datum=date.today(),
         zahlungsziel_tage=vorlage.zahlungsziel_tage,
+        betreff=vorlage.betreff,
+        auftragsart=vorlage.auftragsart,
         kopftext=vorlage.kopftext,
         fusstext=vorlage.fusstext,
         erstellt_von=benutzer_id,
@@ -430,6 +434,105 @@ def dupliziere_beleg(
     session.flush()
     aktualisiere_summen(session, neu)
     return neu
+
+
+# ------------------------------------------------------------ Entwurf löschen
+
+
+def loesche_entwurf(session: Session, beleg: Beleg) -> None:
+    """Löscht einen Beleg im Entwurf samt Positionen (Kplus „Beleg löschen").
+
+    Nur Entwürfe: gebuchte Belege haben Lager- und Zahlungswirkung und werden
+    storniert, nie gelöscht. Ein Entwurf kann keine Folgebelege haben
+    (Folgebelege setzen „gedruckt" voraus). Zugeordnete Arbeitszeiten werden
+    vom Beleg gelöst, nicht gelöscht — die Stunden sind ja geleistet.
+    """
+    pruefe_bearbeitbar(beleg)
+    from app.models.zeiterfassung import Zeiterfassung  # zirkulären Import vermeiden
+
+    for zeit in session.exec(
+        select(Zeiterfassung).where(Zeiterfassung.beleg_id == beleg.id)
+    ).all():
+        zeit.beleg_id = None
+        session.add(zeit)
+    for position in _lade_positionen(session, beleg):
+        for zuordnung in session.exec(
+            select(BelegPositionSeriennummer).where(
+                BelegPositionSeriennummer.position_id == position.id
+            )
+        ).all():
+            session.delete(zuordnung)
+        session.delete(position)
+    session.delete(beleg)
+    session.flush()
+
+
+# ------------------------------------------------- Kplus: Angebot erhalten / nicht
+
+
+def angebot_ist_offen(beleg: Beleg) -> bool:
+    """Angebot, das noch „erhalten"/„nicht erhalten" werden kann (UI-Anzeige)."""
+    return (
+        beleg.belegart == Belegart.ANGEBOT
+        and beleg.status in (BelegStatus.ENTWURF, BelegStatus.GEDRUCKT)
+        and not beleg.angebotsergebnis
+    )
+
+
+def _pruefe_angebot_offen(angebot: Beleg) -> None:
+    if angebot.belegart != Belegart.ANGEBOT:
+        raise UngueltigeBelegart(
+            f"'Auftrag erhalten' gibt es nur für Angebote, nicht für {angebot.belegart}"
+        )
+    # Offen = Entwurf oder gedruckt ohne Ergebnis. Ein erledigtes Angebot ohne
+    # Ergebnis (Altbestand vor dieser Funktion) hat seinen Auftrag bereits.
+    if not angebot_ist_offen(angebot):
+        raise UngueltigerStatusUebergang(
+            f"Angebot {angebot.belegnr} ist bereits abgeschlossen "
+            f"({angebot.angebotsergebnis or angebot.status})"
+        )
+
+
+def angebot_erhalten(
+    session: Session,
+    angebot: Beleg,
+    benutzer_id: int | None = None,
+    auftragsart: str = "",
+    termin: date | None = None,
+) -> Beleg:
+    """Kplus „Auftrag erhalten": erzeugt den Auftrag als Folgebeleg und erledigt das Angebot.
+
+    Darf auch aus dem Entwurf heraus (der Kunde sagt am Telefon zu, bevor das
+    Angebot formal gedruckt wurde): dann wird das Angebot zuerst gebucht
+    (Summen einfrieren), damit die Folgebeleg-Logik greift. Alle Positionen
+    wandern vollständig in den Auftrag; der Auftrag bekommt die gewählte
+    Auftragsart und den Termin.
+    """
+    _pruefe_angebot_offen(angebot)
+    if angebot.status == BelegStatus.ENTWURF:
+        setze_status(session, angebot, BelegStatus.GEDRUCKT, benutzer_id=benutzer_id)
+    auftrag = erzeuge_folgebeleg(session, angebot, benutzer_id=benutzer_id)
+    auftrag.auftragsart = auftragsart
+    auftrag.termin = termin
+    angebot.angebotsergebnis = Angebotsergebnis.ERHALTEN
+    session.add(auftrag)
+    session.add(angebot)
+    session.flush()
+    return auftrag
+
+
+def angebot_nicht_erhalten(session: Session, angebot: Beleg) -> None:
+    """Kplus „Auftrag nicht erhalten": Angebot als verloren erledigen.
+
+    Angebote haben keine Lagerwirkung, deshalb wird der Status hier direkt
+    gesetzt — auch aus dem Entwurf heraus (die Statusmaschine kennt keinen
+    Weg Entwurf→Erledigt, weil der für buchende Belegarten falsch wäre).
+    """
+    _pruefe_angebot_offen(angebot)
+    angebot.angebotsergebnis = Angebotsergebnis.NICHT_ERHALTEN
+    angebot.status = BelegStatus.ERLEDIGT
+    session.add(angebot)
+    session.flush()
 
 
 # ------------------------------------------------------ Kplus: Abschlag/Sammelrechnung

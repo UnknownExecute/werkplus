@@ -58,7 +58,7 @@ def test_dashboard_nach_seed(engine, client):
     assert "/anlagen?wartung=faellig" in r.text
     # Letzte Belege enthalten die Demo-Rechnung
     rechnungsnr = _demo_rechnungsnr(engine)
-    assert rechnungsnr.startswith(f"RE-{date.today().year}-")
+    assert rechnungsnr == f"{date.today().year % 100:02d}0001"  # Kplus-Format JJNNNN
     assert rechnungsnr in r.text
 
 

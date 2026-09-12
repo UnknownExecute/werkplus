@@ -1,5 +1,6 @@
 """Tests für die Beleg-UI (Liste, Anlage, Editor, Positionen, Status, Folgebeleg)."""
 
+from datetime import date
 from decimal import Decimal
 
 from sqlmodel import Session, select
@@ -17,6 +18,8 @@ from app.models import (
 )
 from app.models.benutzer import Benutzer, Rolle
 from app.services.auth_service import hash_passwort
+
+jahr = date.today().year
 
 
 def _login(engine, client, login="tester", passwort="geheim", rolle=Rolle.SACHBEARBEITER):
@@ -93,14 +96,15 @@ def test_beleg_anlegen_editor_mit_belegnr(engine, client):
 
     r = client.get(f"/belege/detail/{beleg_id}")
     assert r.status_code == 200
-    assert "AN-" in r.text  # Nummernkreis-Präfix Angebot
     assert "Muster GmbH" in r.text
 
     with Session(engine) as session:
         beleg = session.get(Beleg, beleg_id)
         assert beleg.belegart == Belegart.ANGEBOT
         assert beleg.status == BelegStatus.ENTWURF
-        assert beleg.belegnr.startswith("AN-")
+        # Kplus-Format: zweistelliges Jahr + laufende Nummer
+        assert beleg.belegnr == f"{jahr % 100:02d}0001"
+        assert beleg.belegnr in r.text
 
 
 def test_artikelsuche_partial_liefert_treffer(engine, client):
@@ -343,7 +347,7 @@ def test_folgebeleg_aus_gedrucktem_angebot(engine, client):
     with Session(engine) as session:
         neu = session.get(Beleg, neu_id)
         assert neu.belegart == Belegart.AUFTRAG
-        assert neu.belegnr.startswith("AB-")
+        assert neu.belegnr == f"{jahr % 100:02d}0001"  # eigener Zähler je Belegart
         assert neu.vorgaenger_beleg_id == beleg_id
         positionen = list(
             session.exec(select(BelegPosition).where(BelegPosition.beleg_id == neu_id)).all()

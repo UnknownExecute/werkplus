@@ -247,13 +247,20 @@ def seed_demo_durchlauf(session: Session) -> None:
     ventil = _hole_artikel(session, "HZ-1102")
     stunde = _hole_artikel(session, "DL-9001")
 
-    angebot = beleg_service.erstelle_beleg(session, Belegart.ANGEBOT, kunde)
+    angebot = beleg_service.erstelle_beleg(
+        session, Belegart.ANGEBOT, kunde,
+        betreff="Angebot Heizungstausch Gastherme inkl. Montage",
+    )
     beleg_service.fuege_position_hinzu(session, angebot, therme, menge=Decimal("1"))
     beleg_service.fuege_position_hinzu(session, angebot, ventil, menge=Decimal("8"))
     beleg_service.fuege_position_hinzu(session, angebot, stunde, menge=Decimal("6"))
     beleg_service.setze_status(session, angebot, BelegStatus.GEDRUCKT)
 
     auftrag = beleg_service.erzeuge_folgebeleg(session, angebot)
+    auftrag.auftragsart = "liefer"
+    angebot.angebotsergebnis = "erhalten"
+    session.add(auftrag)
+    session.add(angebot)
     beleg_service.setze_status(session, auftrag, BelegStatus.GEDRUCKT)
 
     lieferschein = beleg_service.erzeuge_folgebeleg(session, auftrag)
@@ -293,6 +300,8 @@ def _seed_demo_zeiten(session: Session) -> None:
     material = _hole_artikel(session, "DL-9005")
     auftrag = beleg_service.erstelle_beleg(
         session, Belegart.AUFTRAG, kunde,
+        betreff="Regiearbeiten Heizungstausch",
+        auftragsart="service",
         kopftext="Regiearbeiten Heizungstausch (Demo für die Arbeitszeiterfassung)",
     )
     beleg_service.fuege_position_hinzu(session, auftrag, material, menge=Decimal("2"))

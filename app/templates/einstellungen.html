@@ -58,6 +58,42 @@
       </div>
       <button class="btn btn-primary" type="submit">Speichern</button>
     </form>
+
+    {# Nummernkreise: Kplus-Format JJNNNN je Belegart. Stand = letzte vergebene
+       Nummer; damit lässt sich nahtlos an die alte Nummerierung anschließen. #}
+    <h2 class="h5 mt-5 mb-2">Nummernkreise {{ nk_jahr }}</h2>
+    <p class="text-muted">
+      Belegnummern bestehen aus zweistelligem Jahr und laufender Nummer (z.&nbsp;B. <code>260001</code>),
+      jede Belegart zählt für sich. Hier lässt sich der Stand nach oben setzen, damit die
+      Nummern an die alte Software anschließen. Der Stand kann nicht unter bereits vergebene Nummern fallen.
+    </p>
+    {% if nk_gespeichert %}
+    <div class="alert alert-success" role="alert">Nummernkreise gespeichert.</div>
+    {% endif %}
+    {% if nk_fehler %}
+    <div class="alert alert-danger" role="alert">{{ nk_fehler }}</div>
+    {% endif %}
+    <form method="post" action="/einstellungen/nummernkreise">
+      <table class="table tabelle-kompakt align-middle">
+        <thead>
+          <tr><th>Belegart</th><th style="width:12rem">Letzte Nummer (Stand)</th><th>Nächste Belegnummer</th></tr>
+        </thead>
+        <tbody>
+          {% for art, label, stand, naechste in nk_zeilen %}
+          <tr>
+            <td>{{ label }}</td>
+            <td>
+              <input class="form-control form-control-sm" type="number" min="{{ stand }}" step="1"
+                     name="stand_{{ art }}" id="stand_{{ art }}" value="{{ stand }}"
+                     aria-label="Stand {{ label }}">
+            </td>
+            <td><code>{{ naechste }}</code></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button class="btn btn-outline-primary" type="submit">Nummernkreise speichern</button>
+    </form>
   </div>
 
   {# Version + Codestand: damit nach einem Update in der UI prüfbar ist, ob der

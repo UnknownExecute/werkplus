@@ -5,6 +5,9 @@ from app.models.aktivitaet import Aktivitaet, AktivitaetTyp
 from app.models.anlage import Anlage, Serviceeinsatz
 from app.models.artikel import UST_SAETZE, Artikel
 from app.models.beleg import (
+    AUFTRAGSART_LABELS,
+    Angebotsergebnis,
+    Auftragsart,
     Beleg,
     Belegart,
     BelegPosition,
@@ -30,7 +33,10 @@ from app.models.zahlung import Zahlung, Zahlungsart
 from app.models.zeiterfassung import Zeiterfassung
 
 __all__ = [
+    "AUFTRAGSART_LABELS",
     "UST_SAETZE",
+    "Angebotsergebnis",
+    "Auftragsart",
     "Adresse",
     "AdressTyp",
     "Aktivitaet",

@@ -1,0 +1,105 @@
+{# Kplus-Belegübersicht: Tabelle + Summenzeile + Blätterwerk (HTMX-Partial in #uebersicht-body).
+   Jede Zeile trägt data-Attribute, aus denen uebersicht.js die Aktionsleiste
+   speist (welche Aktion ist für den markierten Beleg erlaubt?). #}
+{% macro status_icon(beleg) -%}
+  {%- if beleg.status == 'storniert' -%}
+  <span class="wp-status wp-status-storniert" title="Storniert"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8M16 8l-8 8"/></svg><span class="visually-hidden">Storniert</span></span>
+  {%- elif beleg.angebotsergebnis == 'nicht_erhalten' -%}
+  <span class="wp-status wp-status-verloren" title="Auftrag nicht erhalten"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="visually-hidden">Nicht erhalten</span></span>
+  {%- elif beleg.status == 'erledigt' -%}
+  <span class="wp-status wp-status-erledigt" title="Erledigt{% if beleg.angebotsergebnis == 'erhalten' %} – Auftrag erhalten{% endif %}"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><span class="visually-hidden">Erledigt</span></span>
+  {%- elif beleg.status == 'gedruckt' -%}
+  <span class="wp-status wp-status-offen" title="Gedruckt / offen"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg><span class="visually-hidden">Offen</span></span>
+  {%- else -%}
+  <span class="wp-status wp-status-entwurf" title="Entwurf (nicht gedruckt)"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16zM13 7l4 4"/></svg><span class="visually-hidden">Entwurf</span></span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% set spalten = 12 %}
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt wp-ueb-tabelle mb-0" id="ueb-tabelle">
+  <thead>
+    <tr>
+      <th>Nummer</th>
+      <th class="text-center">Status</th>
+      <th class="text-center">Druck</th>
+      <th>Datum</th>
+      <th>Termin</th>
+      <th>Name</th>
+      <th>Betreff</th>
+      {% if art == 'auftrag' %}<th>Auftragsart</th>{% endif %}
+      {% if zahlungsrelevant %}<th>Zahlung</th>{% endif %}
+      <th class="text-end d-none d-xxl-table-cell">Netto</th>
+      <th class="text-end">Brutto</th>
+      <th>{{ folgebeleg_ziel_label or "Folgebeleg" }}</th>
+      <th class="d-none d-xxl-table-cell">Erstellt von</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for beleg, adresse in belege %}
+    {% set folgen = nachfolger.get(beleg.id, []) %}
+    <tr class="wp-ueb-zeile" tabindex="0" role="row" aria-selected="false"
+        data-id="{{ beleg.id }}" data-nr="{{ beleg.belegnr }}" data-adresse-id="{{ beleg.adresse_id }}"
+        data-status="{{ beleg.status }}" data-brutto="{{ beleg.summe_brutto }}"
+        data-entwurf="{{ 1 if beleg.status == 'entwurf' else 0 }}"
+        data-folgebeleg="{{ 1 if beleg.status in ('gedruckt', 'erledigt') else 0 }}"
+        data-angebot-offen="{{ 1 if (beleg.belegart == 'angebot' and not beleg.angebotsergebnis and beleg.status in ('entwurf', 'gedruckt')) else 0 }}"
+        data-erledigbar="{{ 1 if beleg.status == 'gedruckt' else 0 }}">
+      <td data-label="Nummer"><a class="fw-semibold" href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+      <td data-label="Status" class="text-center">{{ status_icon(beleg) }}</td>
+      <td data-label="Druck" class="text-center">
+        {% if beleg.gedruckt_am %}
+        <a class="wp-status wp-status-druck" href="/belege/detail/{{ beleg.id }}/pdf" target="_blank"
+           title="Gedruckt am {{ beleg.gedruckt_am | datum }} – PDF öffnen">
+          <svg viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M6 14h12v7H6z"/></svg><span class="visually-hidden">Gedruckt</span>
+        </a>
+        {% endif %}
+      </td>
+      <td data-label="Datum" class="text-nowrap">{{ beleg.datum | datum }}</td>
+      <td data-label="Termin" class="text-nowrap">{{ beleg.termin | datum }}</td>
+      <td data-label="Name" class="fw-semibold">{{ adresse.firma }}</td>
+      <td data-label="Betreff" class="wp-ueb-betreff">{{ beleg.betreff }}</td>
+      {% if art == 'auftrag' %}
+      <td data-label="Auftragsart">{{ auftragsart_labels.get(beleg.auftragsart, '') if beleg.auftragsart else '' }}</td>
+      {% endif %}
+      {% if zahlungsrelevant %}
+      <td data-label="Zahlung">
+        {% set zs = zahlung_map.get(beleg.id) %}
+        {% if zs and beleg.status in ('gedruckt', 'erledigt') %}
+        <span class="badge {{ zahlstatus_badges[zs[0]] }}">{{ zahlstatus_labels[zs[0]] }}</span>
+        {% endif %}
+      </td>
+      {% endif %}
+      <td data-label="Netto" class="text-end text-nowrap d-none d-xxl-table-cell">{{ beleg.summe_netto | euro }}</td>
+      <td data-label="Brutto" class="text-end text-nowrap fw-semibold">{{ beleg.summe_brutto | euro }}</td>
+      <td data-label="Folgebeleg" class="text-nowrap">
+        {% for folge in folgen[:2] %}<a href="/belege/detail/{{ folge.id }}">{{ folge.belegnr }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        {% if folgen | length > 2 %}<span class="text-muted">+{{ folgen | length - 2 }}</span>{% endif %}
+      </td>
+      <td data-label="Erstellt von" class="text-muted small d-none d-xxl-table-cell">{{ ersteller.get(beleg.erstellt_von, '') }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="{{ spalten }}" class="text-center text-muted py-4">
+        {% if gefiltert %}
+        Keine Belege gefunden, die zu Suche und Filter passen.<br>
+        <span class="small">Suchbegriff ändern oder den Statusfilter auf &bdquo;Alle&ldquo; stellen.</span>
+        {% else %}
+        Noch keine Belege dieser Art vorhanden.<br>
+        <span class="small">Mit &bdquo;Neu&ldquo; den ersten anlegen.</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="wp-ueb-fuss">
+  <div class="wp-ueb-fuss-summe">
+    <span><span id="ueb-markiert-anzahl">0</span> von {{ pag.gesamt if pag else belege | length }} markiert</span>
+    <span class="ms-3">Summe: <strong id="ueb-markiert-summe">0,00</strong>
+      von <strong>{{ gesamt_summe | euro }}</strong> &euro;</span>
+  </div>
+  {% include "partials/pagination.html" %}
+</div>

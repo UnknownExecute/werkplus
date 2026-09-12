@@ -1,0 +1,34 @@
+{# Kplus „Auftrag erhalten": Auftragsart + Termin wählen, dann wird der Auftrag
+   als Folgebeleg erzeugt und das Angebot erledigt. Wird im Editor und in der
+   Belegübersicht per HTMX nachgeladen. #}
+<div class="card mt-2 mb-3 auftrag-erhalten-dialog">
+  <div class="card-body py-3">
+    <h6 class="card-title">Auftrag erhalten: Angebot {{ beleg.belegnr }} → Auftrag</h6>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/auftrag-erhalten" class="row g-2 align-items-end">
+      <input type="hidden" name="zurueck" value="{{ zurueck }}">
+      <div class="col-md-4">
+        <label class="form-label" for="ae-auftragsart">Auftragsart</label>
+        <select class="form-select form-select-sm" id="ae-auftragsart" name="auftragsart" autofocus>
+          <option value="">– bitte wählen –</option>
+          {% for a in auftragsarten %}
+          <option value="{{ a }}">{{ auftragsart_labels[a] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="ae-termin">Termin</label>
+        <input class="form-control form-control-sm" type="date" id="ae-termin" name="termin"
+               value="{{ beleg.termin.isoformat() if beleg.termin else '' }}">
+      </div>
+      <div class="col-md-5 d-flex gap-2">
+        <button class="btn btn-sm btn-success" type="submit">Auftrag erzeugen</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="this.closest('.auftrag-erhalten-dialog').remove()">Abbrechen</button>
+      </div>
+      <div class="col-12 form-text">
+        Alle Positionen werden in den Auftrag übernommen, das Angebot wird als „erledigt / Auftrag erhalten“ markiert.
+        {% if beleg.status == 'entwurf' %}Das Angebot wird dabei gebucht (Summen fixiert).{% endif %}
+      </div>
+    </form>
+  </div>
+</div>

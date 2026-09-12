@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import Column, UniqueConstraint
+from sqlalchemy import Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.models.types import DecimalStr
@@ -28,14 +28,42 @@ class BelegStatus(StrEnum):
     STORNIERT = "storniert"
 
 
+class Auftragsart(StrEnum):
+    """Kplus-Auftragsart — nur am Auftrag wählbar (Anwenderwunsch)."""
+
+    SERVICE = "service"
+    BESTELL = "bestell"
+    LIEFER = "liefer"
+
+
+AUFTRAGSART_LABELS: dict[str, str] = {
+    "": "–",
+    Auftragsart.SERVICE: "Serviceauftrag",
+    Auftragsart.BESTELL: "Bestellauftrag",
+    Auftragsart.LIEFER: "Lieferauftrag",
+}
+
+
+class Angebotsergebnis(StrEnum):
+    """Ausgang eines Angebots (Kplus: „Auftrag erhalten / nicht erhalten")."""
+
+    OFFEN = ""
+    ERHALTEN = "erhalten"
+    NICHT_ERHALTEN = "nicht_erhalten"
+
+
 class Beleg(SQLModel, table=True):
     """Belegkopf — eine Tabelle für alle Belegarten (Discriminator: belegart)."""
 
     __tablename__ = "beleg"
+    # Belegnummern sind je Belegart eindeutig (Kplus-Nummernlogik: eigener
+    # Zähler je Belegart, Format JJNNNN — Angebot 260001 und Rechnung 260001
+    # dürfen nebeneinander existieren).
+    __table_args__ = (Index("ix_beleg_belegart_belegnr", "belegart", "belegnr", unique=True),)
 
     id: int | None = Field(default=None, primary_key=True)
     belegart: Belegart = Field(index=True)
-    belegnr: str = Field(unique=True, index=True)
+    belegnr: str = Field(index=True)
     status: BelegStatus = Field(default=BelegStatus.ENTWURF, index=True)
     adresse_id: int = Field(foreign_key="adresse.id", index=True)
     datum: date = Field(default_factory=date.today)
@@ -43,6 +71,13 @@ class Beleg(SQLModel, table=True):
     leistungsdatum_bis: date | None = None
     vorgaenger_beleg_id: int | None = Field(default=None, foreign_key="beleg.id", index=True)
     zahlungsziel_tage: int = 14
+    # Kplus-Kopffelder: Betreff (wichtigste Spalte der Belegübersicht), Termin
+    # (Liefer-/Ausführungstermin), Auftragsart (nur Auftrag) und der Ausgang
+    # eines Angebots ("erhalten"/"nicht_erhalten"/"" = offen).
+    betreff: str = Field(default="", index=True)
+    termin: date | None = None
+    auftragsart: str = Field(default="", index=True)
+    angebotsergebnis: str = Field(default="", index=True)
     kopftext: str = ""
     fusstext: str = ""
     # Summen (werden bei jeder Änderung neu berechnet, beim Druck eingefroren)

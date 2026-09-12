@@ -126,14 +126,15 @@ def test_nur_ansehen_darf_nicht_schreiben(engine, client):
 
 def test_suche_zeigt_keine_fremdbereich_belege(engine, client):
     adresse_id, _ = _stammdaten(engine)
-    _beleg(engine, Belegart.BESTELLUNG, adresse_id)
-    _beleg(engine, Belegart.ANGEBOT, adresse_id)
+    bestellung_id = _beleg(engine, Belegart.BESTELLUNG, adresse_id)
+    angebot_id = _beleg(engine, Belegart.ANGEBOT, adresse_id)
     _login_mit_rechten(engine, client, login="nurverkauf", recht_verkauf=Zugriff.BEARBEITEN)
 
     r = client.get("/suche?q=Zwitter")
     assert r.status_code == 200
-    assert "AN-" in r.text  # Angebot (Verkauf) erlaubt
-    assert "BE-" not in r.text  # Bestellung (Einkauf) gefiltert
+    # Belegnummern sind je Belegart gleich (260001) — daher über die Links prüfen
+    assert f"/belege/detail/{angebot_id}" in r.text  # Angebot (Verkauf) erlaubt
+    assert f"/belege/detail/{bestellung_id}" not in r.text  # Bestellung (Einkauf) gefiltert
 
 
 def test_suche_zeigt_keine_adressen_ohne_recht(engine, client):

@@ -221,7 +221,16 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
 - Belegkette Einkauf: Bestellung → EK-Lieferschein (Wareneingang) → EK-Rechnung
 - Statusmaschine je Beleg: Entwurf → Gedruckt → Erledigt/Storniert; gedruckte
   Rechnungen sind unveränderlich (nur Storno/Gutschrift)
-- Nummernkreise je Belegart und Jahr (z. B. `RE-2026-0001`), transaktionssicher
+- Nummernkreise je Belegart und Jahr im Kplus-Format `JJNNNN` (z. B. `260001`),
+  transaktionssicher; jede Belegart zählt für sich (Angebot 260001 und Rechnung
+  260001 dürfen nebeneinander existieren). Startwert je Belegart unter
+  *Einstellungen → Nummernkreise* setzbar (Anschluss an die alte Software)
+- Belegübersicht VK/EK im Kplus-Stil: ein Reiter je Belegart, Aktionsleiste
+  (Kopfdaten, Positionen, Drucken, Kopieren, Löschen, Folgebeleg, Auftrag
+  erhalten / nicht erhalten), Filter (Suchbegriff, Datum, Status, nur eigene,
+  Auftragsart), Summenzeile; am Handy als Kartenliste
+- Belegkopf: Betreff, Termin, Auftragsart (nur Auftrag: Service-/Bestell-/
+  Lieferauftrag), Angebotsausgang (erhalten/nicht erhalten)
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG
