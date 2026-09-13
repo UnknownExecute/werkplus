@@ -23,6 +23,8 @@ def _suche_adressen(session: Session, muster: str) -> list[Adresse]:
         select(Adresse)
         .where(
             Adresse.firma.ilike(muster)  # type: ignore[attr-defined]
+            | Adresse.adressnr.ilike(muster)  # type: ignore[attr-defined]
+            | Adresse.matchcode.ilike(muster)  # type: ignore[attr-defined]
             | Adresse.ansprechpartner.ilike(muster)  # type: ignore[attr-defined]
             | Adresse.ort.ilike(muster)  # type: ignore[attr-defined]
             | Adresse.uid.ilike(muster)  # type: ignore[attr-defined]

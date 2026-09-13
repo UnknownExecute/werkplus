@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Wiedervorlage{% endblock %}
+{% block content %}
+{# Kplus „Wiedervorlage": alle offenen Aktivitäten mit Datum über alle Adressen #}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Wiedervorlage
+    {% if faellig_anzahl %}<span class="badge text-bg-danger">{{ faellig_anzahl }} fällig</span>{% endif %}
+  </h1>
+  <form class="d-flex gap-3 align-items-center" method="get" action="/wiedervorlage">
+    <div class="btn-group btn-group-sm" role="group">
+      {% for wert, text in (("faellig", "Fällig"), ("woche", "Nächste 7 Tage"), ("alle", "Alle offenen")) %}
+      <input type="radio" class="btn-check" name="filter" id="wv-{{ wert }}" value="{{ wert }}"
+             {% if filter == wert %}checked{% endif %} onchange="this.form.submit()">
+      <label class="btn btn-outline-primary" for="wv-{{ wert }}">{{ text }}</label>
+      {% endfor %}
+    </div>
+    <label class="form-check mb-0">
+      <input class="form-check-input" type="checkbox" name="nur_eigene" value="1" {% if nur_eigene %}checked{% endif %}
+             onchange="this.form.submit()">
+      <span class="form-check-label">Nur meine</span>
+    </label>
+  </form>
+</div>
+
+<div class="card">
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt align-middle mb-0">
+  <thead>
+    <tr><th>Wiedervorlage</th><th>Art</th><th>Adresse</th><th>Betreff</th><th>Beleg</th><th class="text-end"></th></tr>
+  </thead>
+  <tbody>
+    {% for a, adresse in zeilen %}
+    <tr class="{% if a.ist_faellig(heute) %}table-danger{% endif %}">
+      <td class="text-nowrap">{{ a.wiedervorlage_am | datum }}
+        {% if a.wiedervorlage_am < heute %}<span class="badge text-bg-danger ms-1">überfällig</span>
+        {% elif a.wiedervorlage_am == heute %}<span class="badge text-bg-warning text-dark ms-1">heute</span>{% endif %}
+      </td>
+      <td>{{ aktivitaet_labels.get(a.typ, a.typ) }}</td>
+      <td><a href="/adressen/{{ adresse.id }}?tab=aktivitaeten">{{ adresse.adressnr }} {{ adresse.firma }}</a>
+        {% if adresse.telefon %}<div class="small text-muted">Tel. {{ adresse.telefon }}</div>{% endif %}</td>
+      <td><strong>{{ a.betreff }}</strong>{% if a.text %}<div class="small text-muted">{{ a.text }}</div>{% endif %}</td>
+      <td>{% if a.beleg_id and akt_belegnr.get(a.beleg_id) %}<a href="/belege/detail/{{ a.beleg_id }}">{{ akt_belegnr[a.beleg_id] }}</a>{% endif %}</td>
+      <td class="text-end">
+        <form method="post" action="/adressen/{{ adresse.id }}/aktivitaeten/{{ a.id }}/erledigt?zurueck=wiedervorlage">
+          <button class="btn btn-sm btn-outline-success" type="submit">Erledigt</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-center text-muted py-4">
+      {% if filter == 'faellig' %}Nichts fällig. {% endif %}Keine offenen Wiedervorlagen{% if nur_eigene %} für dich{% endif %}.
+    </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

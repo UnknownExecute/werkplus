@@ -44,10 +44,11 @@
     </div>
     <nav class="wp-nav">
       {% call navlink('/', 'Dashboard', exakt=True) %}<svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>{% endcall %}
+      {% call navlink('/wiedervorlage', 'Wiedervorlage', bereich='adressen') %}<svg viewBox="0 0 24 24"><path d="M4 5h16v15H4zM4 10h16M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg>{% endcall %}
 
       {% if darf_bereich(request, 'adressen') or darf_bereich(request, 'artikel') %}
       <div class="wp-nav-section">Stammdaten</div>
-      {% call navlink('/adressen', 'Adressen', bereich='adressen') %}<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M17 11a3 3 0 100-6"/></svg>{% endcall %}
+      {% call navlink('/adressen', 'Adressmanager', bereich='adressen') %}<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M17 11a3 3 0 100-6"/></svg>{% endcall %}
       {% call navlink('/artikel', 'Artikel', bereich='artikel') %}<svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10"/></svg>{% endcall %}
       {% call navlink('/textbausteine', 'Textbausteine', bereich='artikel') %}<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>{% endcall %}
       {% endif %}

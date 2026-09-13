@@ -1,0 +1,55 @@
+{# Ansprechpartner einer Adresse (HTMX-Partial in #ansprechpartner-bereich).
+   Erwartet: adresse, ansprechpartner (Liste), anreden #}
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead>
+    <tr>
+      <th style="width:2rem"></th>
+      <th>Name</th>
+      <th>Funktion / Abteilung</th>
+      <th>Telefon</th>
+      <th>Mobil</th>
+      <th>E-Mail</th>
+      <th class="text-end"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for k in ansprechpartner %}
+    <tr{% if not k.aktiv %} class="text-muted"{% endif %}>
+      <td>
+        {% if k.ist_hauptkontakt %}
+        <span class="badge text-bg-primary" title="Hauptansprechpartner">★</span>
+        {% else %}
+        <button class="btn btn-sm btn-link p-0 text-muted" type="button" title="Als Hauptansprechpartner setzen"
+                hx-post="/adressen/{{ adresse.id }}/ansprechpartner/{{ k.id }}/haupt"
+                hx-target="#ansprechpartner-bereich" hx-swap="innerHTML">☆</button>
+        {% endif %}
+      </td>
+      <td>
+        <strong>{{ k.anzeigename }}</strong>
+        {% if k.notiz %}<div class="small text-muted">{{ k.notiz }}</div>{% endif %}
+      </td>
+      <td>{{ k.funktion }}{% if k.funktion and k.abteilung %} / {% endif %}{{ k.abteilung }}</td>
+      <td class="text-nowrap">{% if k.telefon %}<a href="tel:{{ k.telefon }}">{{ k.telefon }}</a>{% endif %}</td>
+      <td class="text-nowrap">{% if k.mobil %}<a href="tel:{{ k.mobil }}">{{ k.mobil }}</a>{% endif %}</td>
+      <td>{% if k.email %}<a href="mailto:{{ k.email }}">{{ k.email }}</a>{% endif %}</td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                hx-get="/adressen/{{ adresse.id }}/ansprechpartner/{{ k.id }}/form"
+                hx-target="#ap-form" hx-swap="innerHTML">Bearbeiten</button>
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/adressen/{{ adresse.id }}/ansprechpartner/{{ k.id }}/loeschen"
+                hx-confirm="Ansprechpartner {{ k.anzeigename }} löschen?"
+                hx-target="#ansprechpartner-bereich" hx-swap="innerHTML">Löschen</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="text-muted">Noch keine Ansprechpartner erfasst.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div id="ap-form">
+  {% with kontakt = none %}{% include "partials/ansprechpartner_form.html" %}{% endwith %}
+</div>

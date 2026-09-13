@@ -34,6 +34,7 @@ from app.models import (
     BelegPosition,
     BelegStatus,
     Benutzer,
+    Lieferadresse,
     Rolle,
     Seriennummer,
     Textbaustein,
@@ -165,6 +166,17 @@ def uebersicht_url(belegart: Belegart | str) -> str:
     art = Belegart(belegart)
     bereich = "vk" if art in VERKAUFSARTEN else "ek"
     return f"/belege/uebersicht/{bereich}?art={art}"
+
+
+def _parse_lieferadresse(session: Session, beleg: Beleg, wert: str) -> int | None:
+    """Lieferadresse nur, wenn sie zur Belegadresse gehört; sonst keine."""
+    wert = (wert or "").strip()
+    if not wert.isdigit():
+        return None
+    la = session.get(Lieferadresse, int(wert))
+    if la is None or la.adresse_id != beleg.adresse_id:
+        return None
+    return la.id
 
 
 def _parse_auftragsart(wert: str, belegart: Belegart) -> str:
@@ -928,6 +940,14 @@ def beleg_editor(  # noqa: PLR0913
             "uebersicht_url": uebersicht_url(beleg.belegart),
             "nav_aktiv": f"/belege/uebersicht/{'vk' if beleg.belegart in VERKAUFSARTEN else 'ek'}",
             "loeschbar": beleg.status == BelegStatus.ENTWURF,
+            # Abweichende Lieferadressen des Kunden (Kplus „Lieferadressen")
+            "lieferadressen": list(
+                session.exec(
+                    select(Lieferadresse)
+                    .where(Lieferadresse.adresse_id == beleg.adresse_id)
+                    .order_by(Lieferadresse.bezeichnung)
+                ).all()
+            ),
         }
     )
     kontext.update(_zeiten_kontext(request, session, beleg))
@@ -1390,6 +1410,7 @@ def kopf_speichern(  # noqa: PLR0913
     betreff: str = Form(""),
     termin: str = Form(""),
     auftragsart: str = Form(""),
+    lieferadresse_id: str = Form(""),
     kopftext: str = Form(""),
     fusstext: str = Form(""),
     benutzer: Benutzer = Depends(get_current_user),
@@ -1408,6 +1429,7 @@ def kopf_speichern(  # noqa: PLR0913
     beleg.betreff = betreff.strip()
     beleg.termin = _parse_datum(termin)
     beleg.auftragsart = _parse_auftragsart(auftragsart, beleg.belegart)
+    beleg.lieferadresse_id = _parse_lieferadresse(session, beleg, lieferadresse_id)
     beleg.kopftext = kopftext.strip()
     beleg.fusstext = fusstext.strip()
     session.add(beleg)
@@ -1835,6 +1857,7 @@ def beleg_liste_suche(
 def beleg_neu_form(
     request: Request,
     belegart: str,
+    adresse_id: int | None = None,
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -1846,6 +1869,7 @@ def beleg_neu_form(
             "belegart": art,
             "label": BELEGART_LABELS[art],
             "adressen": _adressen_fuer_belegart(session, art),
+            "vorgewaehlte_adresse_id": adresse_id,
             "heute": date.today(),
             "auftragsart_labels": AUFTRAGSART_LABELS,
             "auftragsarten": list(Auftragsart),

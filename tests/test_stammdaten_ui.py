@@ -109,6 +109,7 @@ def test_adressen_suche_filtert(engine, client):
             ADRESSE_FORM,
             firma="Anders AG",
             ansprechpartner="Anna Anders",
+            email="anna@anders.at",  # sonst trifft die Suche "Muster" die E-Mail-Domäne
             ort="Graz",
             typ="lieferant",
             uid="ATU87654321",

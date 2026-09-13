@@ -14,7 +14,7 @@ from types import ModuleType
 import jinja2
 from sqlmodel import Session, select
 
-from app.models.adresse import Adresse
+from app.models.adresse import Adresse, Lieferadresse
 from app.models.artikel import Artikel
 from app.models.beleg import (
     AUFTRAGSART_LABELS,
@@ -175,9 +175,14 @@ def _baue_kontext(session: Session, beleg: Beleg) -> dict:
     if beleg.vorgaenger_beleg_id is not None:
         vorgaenger = session.get(Beleg, beleg.vorgaenger_beleg_id)
 
+    lieferadresse = (
+        session.get(Lieferadresse, beleg.lieferadresse_id) if beleg.lieferadresse_id else None
+    )
+
     return {
         "beleg": beleg,
         "adresse": adresse,
+        "lieferadresse": lieferadresse,
         "positionen": positionen,
         "sn_je_position": sn_je_position,
         "artikelnr_je_position": artikelnr_je_position,

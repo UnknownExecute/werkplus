@@ -23,6 +23,7 @@ from app.models import (
     Benutzer,
 )
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS, _bereich_fuer
+from app.services import adresse_service
 from app.services.berechtigung import darf_bereich
 from app.templating import templates
 
@@ -122,6 +123,12 @@ def dashboard(
         _offene_posten(session) if darf_verkauf else ([], Decimal("0.00"), 0)
     )
     wartungen = _faellige_wartungen(session) if darf_bereich(request, "anlagen") else []
+    # Kplus-Wiedervorlage: fällige (heute oder überfällige) offene Aktivitäten
+    wiedervorlagen = (
+        adresse_service.offene_wiedervorlagen(session, bis=date.today())
+        if darf_bereich(request, "adressen")
+        else []
+    )
     letzte_belege = [
         (beleg, adresse)
         for beleg, adresse in _letzte_belege(session)
@@ -140,6 +147,8 @@ def dashboard(
             "offen_gesamt": offen_gesamt,
             "offene_posten_anzahl": offene_posten_anzahl,
             "wartungen": wartungen,
+            "wiedervorlagen": wiedervorlagen[:MAX_ZEILEN],
+            "wiedervorlagen_anzahl": len(wiedervorlagen),
             "letzte_belege": letzte_belege,
             "heute": date.today(),
             "belegart_labels": BELEGART_LABELS,

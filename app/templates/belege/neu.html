@@ -7,7 +7,7 @@
     <label class="form-label" for="adresse_id">Adresse</label>
     <select class="form-select" name="adresse_id" id="adresse_id" required>
       {% for adresse in adressen %}
-      <option value="{{ adresse.id }}">{{ adresse.firma }}{% if adresse.ort %} – {{ adresse.ort }}{% endif %}</option>
+      <option value="{{ adresse.id }}" {% if vorgewaehlte_adresse_id == adresse.id %}selected{% endif %}>{{ adresse.adressnr }} {{ adresse.firma }}{% if adresse.ort %} – {{ adresse.ort }}{% endif %}</option>
       {% endfor %}
     </select>
     {% if not adressen %}

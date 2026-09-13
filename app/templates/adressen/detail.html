@@ -1,9 +1,34 @@
 {% extends "base.html" %}
-{% block title %}{{ adresse.firma }}{% endblock %}
+{% block title %}{{ adresse.adressnr }} {{ adresse.firma }}{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 mb-0">{{ adresse.firma }}</h1>
-  <a class="btn btn-outline-secondary" href="/adressen">Zur Liste</a>
+{# Kplus-Adressmanager: Kopf mit Nummer/Name, Kennzahlen, darunter Reiter
+   Stammdaten | Ansprechpartner | Lieferadressen | Aktivitäten | Belege | Anlagen #}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small text-decoration-none" href="/adressen">&larr; Adressmanager</a>
+    <h1 class="h3 mb-0">
+      <span class="text-muted">{{ adresse.adressnr }}</span> {{ adresse.firma }}
+      {% if adresse.matchcode %}<span class="badge text-bg-light border">{{ adresse.matchcode }}</span>{% endif %}
+      {% if not adresse.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
+    </h1>
+    <div class="text-muted small">
+      {% if adresse.name2 %}{{ adresse.name2 }} &middot; {% endif %}
+      {{ adresse.plz }} {{ adresse.ort }}
+      {% if adresse.telefon %} &middot; Tel. {{ adresse.telefon }}{% endif %}
+      {% if adresse.ansprechpartner %} &middot; {{ adresse.ansprechpartner }}{% endif %}
+      {% for m in adresse.merkmal_liste %}<span class="badge text-bg-light border ms-1">{{ m }}</span>{% endfor %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if adresse.id and adresse.ist_kunde and darf_bereich(request, 'verkauf', 'bearbeiten') %}
+    <a class="btn btn-outline-primary" href="/belege/angebot/neu?adresse_id={{ adresse.id }}">Neues Angebot</a>
+    <a class="btn btn-outline-primary" href="/belege/auftrag/neu?adresse_id={{ adresse.id }}">Neuer Auftrag</a>
+    {% endif %}
+    {% if adresse.id and adresse.ist_lieferant and darf_bereich(request, 'einkauf', 'bearbeiten') %}
+    <a class="btn btn-outline-primary" href="/belege/bestellung/neu?adresse_id={{ adresse.id }}">Neue Bestellung</a>
+    {% endif %}
+    {% if adresse.email %}<a class="btn btn-outline-secondary" href="mailto:{{ adresse.email }}">Mail senden</a>{% endif %}
+  </div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -40,17 +65,20 @@
   </div>
 </div>
 
+{% set tab = aktiver_tab | default('stammdaten') %}
 <ul class="nav nav-tabs mb-3" role="tablist">
-  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-stammdaten" type="button">Stammdaten</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-belege" type="button">Belege</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-anlagen" type="button">Anlagen</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-aktivitaeten" type="button">Aktivitäten</button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'stammdaten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-stammdaten" type="button">Adressdaten</button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'ansprechpartner' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-ansprechpartner" type="button">Ansprechpartner <span class="badge rounded-pill text-bg-secondary">{{ ansprechpartner | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'lieferadressen' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-lieferadressen" type="button">Lieferadressen <span class="badge rounded-pill text-bg-secondary">{{ lieferadressen | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'aktivitaeten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-aktivitaeten" type="button">Aktivitäten <span class="badge rounded-pill text-bg-secondary">{{ aktivitaeten | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'belege' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-belege" type="button">Belege <span class="badge rounded-pill text-bg-secondary">{{ belege | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'anlagen' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-anlagen" type="button">Anlagen <span class="badge rounded-pill text-bg-secondary">{{ anlagen | length }}</span></button></li>
 </ul>
 
 <div class="tab-content">
-  <div class="tab-pane fade show active" id="tab-stammdaten">
+  <div class="tab-pane fade {% if tab == 'stammdaten' %}show active{% endif %}" id="tab-stammdaten">
     {% include "partials/adr_dublettenwarnung.html" %}
-    <form method="post" action="/adressen/{{ adresse.id }}" class="col-lg-9">
+    <form method="post" action="/adressen/{{ adresse.id }}">
       {% include "partials/adresse_formularfelder.html" %}
       {% if dubletten %}<input type="hidden" name="trotzdem_speichern" value="true">{% endif %}
       <div class="mt-3">
@@ -59,10 +87,67 @@
     </form>
   </div>
 
-  <div class="tab-pane fade" id="tab-belege">
+  <div class="tab-pane fade {% if tab == 'ansprechpartner' %}show active{% endif %}" id="tab-ansprechpartner">
+    <div id="ansprechpartner-bereich">
+      {% include "partials/ansprechpartner_liste.html" %}
+    </div>
+  </div>
+
+  <div class="tab-pane fade {% if tab == 'lieferadressen' %}show active{% endif %}" id="tab-lieferadressen">
+    <div id="lieferadressen-bereich">
+      {% include "partials/lieferadressen_liste.html" %}
+    </div>
+  </div>
+
+  <div class="tab-pane fade {% if tab == 'aktivitaeten' %}show active{% endif %}" id="tab-aktivitaeten">
+    <form class="card mb-4"
+          hx-post="/adressen/{{ adresse.id }}/aktivitaeten"
+          hx-target="#aktivitaeten-liste" hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      <div class="card-body row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label">Art</label>
+          <select class="form-select" name="typ">
+            {% for wert, text in aktivitaet_labels.items() %}
+            <option value="{{ wert }}">{{ text }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Betreff</label>
+          <input class="form-control" type="text" name="betreff" placeholder="Betreff" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Text</label>
+          <input class="form-control" type="text" name="text" placeholder="Text">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Wiedervorlage am</label>
+          <input class="form-control" type="date" name="wiedervorlage_am">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Beleg</label>
+          <select class="form-select" name="beleg_id">
+            <option value="">–</option>
+            {% for beleg in belege %}
+            <option value="{{ beleg.id }}">{{ belegart_labels[beleg.belegart] }} {{ beleg.belegnr }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary" type="submit">Aktivität anlegen</button>
+        </div>
+      </div>
+    </form>
+    <div id="aktivitaeten-liste">
+      {% include "partials/aktivitaeten_liste.html" %}
+    </div>
+  </div>
+
+  <div class="tab-pane fade {% if tab == 'belege' %}show active{% endif %}" id="tab-belege">
     <table class="table table-hover tabelle-kompakt">
       <thead>
-        <tr><th>Belegnr</th><th>Belegart</th><th>Datum</th><th>Status</th><th class="text-end">Summe brutto</th></tr>
+        <tr><th>Belegnr</th><th>Belegart</th><th>Datum</th><th>Betreff</th><th>Status</th><th class="text-end">Summe brutto</th></tr>
       </thead>
       <tbody>
         {% for beleg in belege %}
@@ -70,17 +155,18 @@
           <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
           <td>{{ belegart_labels[beleg.belegart] }}</td>
           <td>{{ beleg.datum | datum }}</td>
+          <td>{{ beleg.betreff }}</td>
           <td><span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span></td>
           <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-muted">Keine Belege vorhanden.</td></tr>
+        <tr><td colspan="6" class="text-muted">Keine Belege vorhanden.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <div class="tab-pane fade" id="tab-anlagen">
+  <div class="tab-pane fade {% if tab == 'anlagen' %}show active{% endif %}" id="tab-anlagen">
     {# Kunde ist hier bereits bekannt und wird im Formular vorausgewählt —
        auch Bestandsanlagen (Altgeräte ohne Lieferschein) sind so erfassbar. #}
     {% if darf_bereich(request, 'anlagen', 'bearbeiten') %}
@@ -114,33 +200,6 @@
         {% endfor %}
       </tbody>
     </table>
-  </div>
-
-  <div class="tab-pane fade" id="tab-aktivitaeten">
-    <form class="row g-2 mb-4"
-          hx-post="/adressen/{{ adresse.id }}/aktivitaeten"
-          hx-target="#aktivitaeten-liste" hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) this.reset()">
-      <div class="col-md-2">
-        <select class="form-select" name="typ">
-          <option value="notiz">Notiz</option>
-          <option value="telefonat">Telefonat</option>
-          <option value="email">E-Mail</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <input class="form-control" type="text" name="betreff" placeholder="Betreff" required>
-      </div>
-      <div class="col-md-5">
-        <input class="form-control" type="text" name="text" placeholder="Text">
-      </div>
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100" type="submit">Hinzufügen</button>
-      </div>
-    </form>
-    <div id="aktivitaeten-liste">
-      {% include "partials/aktivitaeten_liste.html" %}
-    </div>
   </div>
 </div>
 {% endblock %}

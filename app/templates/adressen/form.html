@@ -3,7 +3,7 @@
 {% block content %}
 <h1 class="h3 mb-4">Neue Adresse</h1>
 {% include "partials/adr_dublettenwarnung.html" %}
-<form method="post" action="/adressen/neu" class="col-lg-9">
+<form method="post" action="/adressen/neu">
   {% include "partials/adresse_formularfelder.html" %}
   {% if dubletten %}<input type="hidden" name="trotzdem_speichern" value="true">{% endif %}
   <div class="mt-3">

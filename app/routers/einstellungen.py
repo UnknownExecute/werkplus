@@ -18,7 +18,7 @@ from app.database import get_session
 from app.dependencies import require_admin
 from app.models import Belegart, Benutzer
 from app.routers.belege import BELEGART_LABELS
-from app.services import firma_service, nummernkreis_service
+from app.services import adresse_service, firma_service, nummernkreis_service
 from app.services.fehler import WerkplusFehler
 from app.templating import templates
 
@@ -53,6 +53,7 @@ def _nummernkreis_kontext(session: Session, jahr: int) -> dict:
     staende = nummernkreis_service.staende(session, jahr)
     return {
         "nk_jahr": jahr,
+        "adressnr_stand": adresse_service.adressnr_stand(session),
         "nk_zeilen": [
             (
                 art,
@@ -104,6 +105,12 @@ async def nummernkreise_speichern(
     formular = await request.form()
     jahr = date.today().year
     try:
+        adress_wert = str(formular.get("stand_adresse", "")).strip()
+        if adress_wert:
+            try:
+                adresse_service.setze_adressnr_stand(session, int(adress_wert))
+            except ValueError:
+                raise WerkplusFehler(f"Adressen: '{adress_wert}' ist keine ganze Zahl") from None
         for art in Belegart:
             wert = str(formular.get(f"stand_{art}", "")).strip()
             if not wert:

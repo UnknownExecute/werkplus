@@ -1,0 +1,34 @@
+{# Lieferadressen einer Adresse (HTMX-Partial in #lieferadressen-bereich). Erwartet: adresse, lieferadressen #}
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead>
+    <tr><th>Bezeichnung</th><th>Name</th><th>Straße</th><th>PLZ / Ort</th><th>Land</th><th class="text-end"></th></tr>
+  </thead>
+  <tbody>
+    {% for la in lieferadressen %}
+    <tr>
+      <td><strong>{{ la.bezeichnung }}</strong>{% if la.notiz %}<div class="small text-muted">{{ la.notiz }}</div>{% endif %}</td>
+      <td>{{ la.name }}</td>
+      <td>{{ la.strasse }}</td>
+      <td>{{ la.plz }} {{ la.ort }}</td>
+      <td>{{ la.land }}</td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                hx-get="/adressen/{{ adresse.id }}/lieferadressen/{{ la.id }}/form"
+                hx-target="#la-form" hx-swap="innerHTML">Bearbeiten</button>
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/adressen/{{ adresse.id }}/lieferadressen/{{ la.id }}/loeschen"
+                hx-confirm="Lieferadresse „{{ la.bezeichnung or la.ort }}“ löschen?"
+                hx-target="#lieferadressen-bereich" hx-swap="innerHTML">Löschen</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-muted">Keine abweichenden Lieferadressen. Belege gehen an die Hauptadresse.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div id="la-form">
+  {% with la = none %}{% include "partials/lieferadresse_form.html" %}{% endwith %}
+</div>

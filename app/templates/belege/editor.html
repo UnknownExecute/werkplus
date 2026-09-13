@@ -131,6 +131,17 @@
         <input class="form-control" value="{{ adresse.firma if adresse else '' }}" disabled>
         {% if adresse %}<div class="form-text"><a href="/adressen/{{ adresse.id }}">Adresse aufrufen</a></div>{% endif %}
       </div>
+      {% if lieferadressen %}
+      <div class="col-md-4">
+        <label class="form-label" for="lieferadresse_id">Lieferadresse</label>
+        <select class="form-select" name="lieferadresse_id" id="lieferadresse_id" {% if not bearbeitbar %}disabled{% endif %}>
+          <option value="">Hauptadresse</option>
+          {% for la in lieferadressen %}
+          <option value="{{ la.id }}" {% if beleg.lieferadresse_id == la.id %}selected{% endif %}>{{ la.kurz }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="col-md-8">
         <label class="form-label" for="betreff">Betreff</label>
         <input class="form-control" type="text" name="betreff" id="betreff" maxlength="200"

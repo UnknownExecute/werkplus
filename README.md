@@ -231,6 +231,12 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
   Auftragsart), Summenzeile; am Handy als Kartenliste
 - Belegkopf: Betreff, Termin, Auftragsart (nur Auftrag: Service-/Bestell-/
   Lieferauftrag), Angebotsausgang (erhalten/nicht erhalten)
+- Adressmanager im Kplus-Stil: Adressnummer (automatisch ab 10001, Startwert in
+  den Einstellungen), Matchcode, Fibunummer, Anrede/Titel/Name 1+2/Briefanrede,
+  Telefon 1/2, Mobil, Fax, E-Mail, Homepage, Branche, Merkmale; Reiter
+  Ansprechpartner (Hauptkontakt), Lieferadressen (am Beleg wählbar, auf dem PDF),
+  Aktivitäten mit Wiedervorlage/Erledigt und Belegbezug; Seite „Wiedervorlage"
+  (fällig / nächste 7 Tage / alle, nur meine) plus Dashboard-Kachel
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG

@@ -76,6 +76,9 @@ class Beleg(SQLModel, table=True):
     # eines Angebots ("erhalten"/"nicht_erhalten"/"" = offen).
     betreff: str = Field(default="", index=True)
     termin: date | None = None
+    # Abweichende Lieferadresse (Tabelle lieferadresse); ohne FK-Constraint, weil
+    # SQLite-Batch-Migrationen an neuen FKs der beleg-Tabelle scheitern können.
+    lieferadresse_id: int | None = Field(default=None, index=True)
     auftragsart: str = Field(default="", index=True)
     angebotsergebnis: str = Field(default="", index=True)
     kopftext: str = ""

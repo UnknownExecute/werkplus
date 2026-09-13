@@ -1,6 +1,11 @@
 {% for adresse in adressen %}
-<tr>
-  <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
+<tr{% if not adresse.aktiv %} class="text-muted"{% endif %}>
+  <td class="text-nowrap">{{ adresse.adressnr or "–" }}</td>
+  <td>{{ adresse.matchcode }}</td>
+  <td>
+    <a href="/adressen/{{ adresse.id }}" class="fw-semibold">{{ adresse.firma }}</a>
+    {% if adresse.name2 %}<div class="small text-muted">{{ adresse.name2 }}</div>{% endif %}
+  </td>
   <td>{{ adresse.ansprechpartner }}</td>
   <td>{{ adresse.plz }} {{ adresse.ort }}</td>
   <td>
@@ -8,15 +13,15 @@
     {% elif adresse.typ == "lieferant" %}<span class="badge text-bg-warning">Lieferant</span>
     {% else %}<span class="badge text-bg-info">Beide</span>{% endif %}
   </td>
-  <td>{{ adresse.telefon }}</td>
+  <td class="text-nowrap">{{ adresse.telefon or adresse.mobil }}</td>
   <td>{{ adresse.email }}</td>
 </tr>
 {% else %}
 <tr>
-  <td colspan="6" class="text-center text-muted py-4">
+  <td colspan="8" class="text-center text-muted py-4">
     {% if gefiltert %}
-    Keine Adressen gefunden, die zu Suche und Typ passen.<br>
-    <span class="small">Suchbegriff ändern oder den Typ auf &bdquo;Alle Typen&ldquo; stellen.</span>
+    Keine Adressen gefunden, die zu Suche und Adressart passen.<br>
+    <span class="small">Suchbegriff ändern oder die Adressart auf &bdquo;Alle&ldquo; stellen.</span>
     {% else %}
     Noch keine Adressen vorhanden.<br>
     <span class="small">Mit &bdquo;Neue Adresse&ldquo; die erste anlegen.</span>
@@ -26,7 +31,7 @@
 {% endfor %}
 {% if pag and pag.seiten > 1 %}
 <tr>
-  <td colspan="6" class="bg-body-tertiary">
+  <td colspan="8" class="bg-body-tertiary">
     {% include "partials/pagination.html" %}
   </td>
 </tr>

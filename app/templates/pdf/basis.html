@@ -84,6 +84,12 @@
   table.positionen tr.hat-sn td {
     border-bottom: none;
   }
+  .lieferadresse {
+    font-size: 9pt;
+    margin: 0 0 0.3cm;
+    padding: 3pt 5pt;
+    border: 0.5pt solid #999;
+  }
   .betreff {
     font-weight: bold;
     margin: -0.2cm 0 0.2cm;
@@ -145,6 +151,13 @@
   </div>
 </div>
 
+{% if lieferadresse %}
+<div class="lieferadresse">
+  <strong>Lieferadresse:</strong>
+  {{ lieferadresse.name or adresse.firma }}{% if lieferadresse.bezeichnung %} ({{ lieferadresse.bezeichnung }}){% endif %},
+  {{ lieferadresse.strasse }}, {{ lieferadresse.plz }} {{ lieferadresse.ort }}{% if lieferadresse.land and lieferadresse.land != adresse.land %}, {{ lieferadresse.land }}{% endif %}
+</div>
+{% endif %}
 <h1>{% block belegtitel %}{{ belegart_label }} {{ beleg.belegnr }}{% endblock %}</h1>
 {% if beleg.betreff %}<div class="betreff">{{ beleg.betreff }}</div>{% endif %}
 <div class="belegmeta">

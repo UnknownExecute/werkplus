@@ -1,0 +1,39 @@
+{# Formular Lieferadresse: la=None → neu, sonst bearbeiten. Erwartet: adresse #}
+<form class="card" hx-post="/adressen/{{ adresse.id }}/lieferadressen{% if la %}/{{ la.id }}{% endif %}"
+      hx-target="#lieferadressen-bereich" hx-swap="innerHTML">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-12"><h3 class="h6 mb-0">{% if la %}Lieferadresse bearbeiten{% else %}Neue Lieferadresse{% endif %}</h3></div>
+    <div class="col-md-3">
+      <label class="form-label">Bezeichnung *</label>
+      <input class="form-control form-control-sm" type="text" name="bezeichnung" value="{{ la.bezeichnung if la else '' }}"
+             placeholder="z. B. Baustelle Nord" required>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Name (Empfänger)</label>
+      <input class="form-control form-control-sm" type="text" name="name" value="{{ la.name if la else adresse.firma }}">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Straße</label>
+      <input class="form-control form-control-sm" type="text" name="strasse" value="{{ la.strasse if la else '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Land</label>
+      <input class="form-control form-control-sm" type="text" name="land" value="{{ la.land if la else 'Österreich' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">PLZ</label>
+      <input class="form-control form-control-sm" type="text" name="plz" value="{{ la.plz if la else '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Ort</label>
+      <input class="form-control form-control-sm" type="text" name="ort" value="{{ la.ort if la else '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Notiz (Anfahrt, Öffnungszeiten)</label>
+      <input class="form-control form-control-sm" type="text" name="notiz" value="{{ la.notiz if la else '' }}">
+    </div>
+    <div class="col-12 text-md-end">
+      <button class="btn btn-sm btn-primary" type="submit">{% if la %}Speichern{% else %}Hinzufügen{% endif %}</button>
+    </div>
+  </div>
+</form>

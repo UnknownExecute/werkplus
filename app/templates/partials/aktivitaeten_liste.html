@@ -1,17 +1,46 @@
+{# Aktivitäten einer Adresse (HTMX-Partial in #aktivitaeten-liste).
+   Erwartet: aktivitaeten, akt_benutzer, akt_belegnr, aktivitaet_labels, heute, adresse_id #}
+{% macro typ_badge(typ) -%}
+  {%- if typ == "telefonat" %}<span class="badge text-bg-primary me-1">Telefonat</span>
+  {%- elif typ == "email" %}<span class="badge text-bg-info me-1">E-Mail</span>
+  {%- elif typ == "termin" %}<span class="badge text-bg-warning text-dark me-1">Termin</span>
+  {%- elif typ == "aufgabe" %}<span class="badge text-bg-dark me-1">Aufgabe</span>
+  {%- else %}<span class="badge text-bg-secondary me-1">Notiz</span>{% endif -%}
+{%- endmacro %}
 {% if aktivitaeten %}
 <ul class="list-group">
-  {% for aktivitaet in aktivitaeten %}
-  <li class="list-group-item">
-    <div class="d-flex justify-content-between">
-      <strong>
-        {% if aktivitaet.typ == "telefonat" %}<span class="badge text-bg-primary me-1">Telefonat</span>
-        {% elif aktivitaet.typ == "email" %}<span class="badge text-bg-info me-1">E-Mail</span>
-        {% else %}<span class="badge text-bg-secondary me-1">Notiz</span>{% endif %}
-        {{ aktivitaet.betreff }}
-      </strong>
-      <small class="text-muted">{{ aktivitaet.zeitstempel | datum }}</small>
+  {% for a in aktivitaeten %}
+  <li class="list-group-item {% if a.erledigt %}text-muted{% elif a.ist_faellig(heute) %}list-group-item-danger{% endif %}">
+    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+      <div>
+        {{ typ_badge(a.typ) }}
+        <strong{% if a.erledigt %} class="text-decoration-line-through"{% endif %}>{{ a.betreff }}</strong>
+        {% if a.wiedervorlage_am %}
+        <span class="badge {% if a.erledigt %}text-bg-light border{% elif a.ist_faellig(heute) %}text-bg-danger{% else %}text-bg-light border{% endif %} ms-1"
+              title="Wiedervorlage">WV {{ a.wiedervorlage_am | datum }}</span>
+        {% endif %}
+        {% if a.beleg_id and akt_belegnr.get(a.beleg_id) %}
+        <a class="badge text-bg-light border ms-1 text-decoration-none" href="/belege/detail/{{ a.beleg_id }}">Beleg {{ akt_belegnr[a.beleg_id] }}</a>
+        {% endif %}
+        {% if a.text %}<div class="mt-1">{{ a.text }}</div>{% endif %}
+        <div class="small text-muted mt-1">
+          {{ a.zeitstempel | datum }} {{ a.zeitstempel.strftime('%H:%M') }}
+          {% if a.benutzer_id and akt_benutzer.get(a.benutzer_id) %} &middot; {{ akt_benutzer[a.benutzer_id] }}{% endif %}
+          {% if a.erledigt and a.erledigt_am %} &middot; erledigt {{ a.erledigt_am | datum }}{% endif %}
+        </div>
+      </div>
+      <div class="d-flex gap-1">
+        <button class="btn btn-sm {% if a.erledigt %}btn-outline-secondary{% else %}btn-outline-success{% endif %}" type="button"
+                hx-post="/adressen/{{ adresse_id }}/aktivitaeten/{{ a.id }}/erledigt"
+                hx-target="#aktivitaeten-liste" hx-swap="innerHTML">
+          {% if a.erledigt %}Wieder öffnen{% else %}Erledigt{% endif %}
+        </button>
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/adressen/{{ adresse_id }}/aktivitaeten/{{ a.id }}/loeschen"
+                hx-confirm="Aktivität „{{ a.betreff }}“ löschen?"
+                hx-target="#aktivitaeten-liste" hx-swap="innerHTML">Löschen</button>
+      </div>
     </div>
-    {% if aktivitaet.text %}<div class="mt-1">{{ aktivitaet.text }}</div>{% endif %}
   </li>
   {% endfor %}
 </ul>

@@ -17,6 +17,7 @@ from app.models import (
     Adresse,
     AdressTyp,
     Anlage,
+    Ansprechpartner,
     Artikel,
     Beleg,
     Belegart,
@@ -27,12 +28,14 @@ from app.models import (
     Lager,
     Lagerbestand,
     Lagerbewegung,
+    Lieferadresse,
     Rolle,
     Seriennummer,
     SnStatus,
     Zeiterfassung,
 )
 from app.services import (
+    adresse_service,
     beleg_service,
     berechnung,
     seriennummer_service,
@@ -48,17 +51,31 @@ BENUTZER = [
     ("mo", "Max Monteur", "mo", "monteur", "68.00"),
 ]
 
+# (firma, matchcode, ansprechpartner (Anrede, Vorname, Nachname, Funktion), strasse, plz, ort,
+#  uid, telefon, email, branche, merkmale)
 KUNDEN = [
-    ("Hotel Alpenblick GmbH", "Fr. Maier", "Dorfstraße 1", "6020", "Innsbruck", "ATU61234567"),
-    ("Bäckerei Brotherz e.U.", "Hr. Weber", "Hauptplatz 4", "4020", "Linz", "ATU62234567"),
-    ("Wohnbau Steiner GmbH", "Hr. Steiner", "Bauring 12", "8010", "Graz", "ATU63234567"),
-    ("Gasthof Post KG", "Fr. Huber", "Poststraße 9", "5020", "Salzburg", "ATU64234567"),
-    ("Privat Fam. Gruber", "Hr. Gruber", "Feldweg 3", "3100", "St. Pölten", ""),
+    ("Hotel Alpenblick GmbH", "ALPENBLICK", ("Frau", "Petra", "Maier", "Direktion"),
+     "Dorfstraße 1", "6020", "Innsbruck", "ATU61234567", "0512 34567", "office@alpenblick.at",
+     "Hotellerie / Gastronomie", "Wartungsvertrag, Großkunde"),
+    ("Bäckerei Brotherz e.U.", "BROTHERZ", ("Herr", "Karl", "Weber", "Inhaber"), "Hauptplatz 4",
+     "4020", "Linz", "ATU62234567", "0732 987654", "info@brotherz.at", "Gewerbe",
+     "Wartungsvertrag"),
+    ("Wohnbau Steiner GmbH", "STEINER", ("Herr", "Josef", "Steiner", "Bauleitung"), "Bauring 12",
+     "8010", "Graz", "ATU63234567", "0316 111222", "bau@steiner.at", "Bauunternehmen", ""),
+    ("Gasthof Post KG", "POST", ("Frau", "Anna", "Huber", "Geschäftsführung"), "Poststraße 9",
+     "5020", "Salzburg", "ATU64234567", "0662 555666", "post@gasthof-post.at",
+     "Hotellerie / Gastronomie", ""),
+    ("Privat Fam. Gruber", "GRUBER", ("Herr", "Franz", "Gruber", ""), "Feldweg 3",
+     "3100", "St. Pölten", "", "0664 1234567", "", "Privat", ""),
 ]
 
 LIEFERANTEN = [
-    ("Vaillant Austria GmbH", "Vertrieb", "Forchheimergasse 7", "1230", "Wien", "ATU65234567"),
-    ("Groß-Elektro Handel AG", "Hr. Ohm", "Industriestraße 20", "4600", "Wels", "ATU66234567"),
+    ("Vaillant Austria GmbH", "VAILLANT", ("", "", "Vertrieb Innendienst", ""),
+     "Forchheimergasse 7", "1230", "Wien", "ATU65234567", "01 863600", "vertrieb@vaillant.at",
+     "Handel", ""),
+    ("Groß-Elektro Handel AG", "GROSSELEKTRO", ("Herr", "Otto", "Ohm", "Verkauf"),
+     "Industriestraße 20", "4600", "Wels", "ATU66234567", "07242 4444",
+     "verkauf@grosselektro.at", "Handel", ""),
 ]
 
 # (artikelnr, bezeichnung, warengruppe, einheit, ek, vk, ust, sn_pflicht, lagerartikel)
@@ -109,25 +126,46 @@ def seed_lager(session: Session) -> Lager:
     return lager
 
 
+def _seed_adresse(session: Session, typ: AdressTyp, daten: tuple, zahlungsziel: int) -> None:
+    firma, matchcode, kontakt, strasse, plz, ort, uid, telefon, email, branche, merkmale = daten
+    if session.exec(select(Adresse).where(Adresse.firma == firma)).first():
+        return
+    adresse = Adresse(
+        typ=typ, firma=firma, matchcode=matchcode, strasse=strasse, plz=plz, ort=ort,
+        uid=uid, telefon=telefon, email=email, branche=branche, merkmale=merkmale,
+        zahlungsziel_tage=zahlungsziel, adressnr=adresse_service.naechste_adressnr(session),
+        briefanrede="Sehr geehrte Damen und Herren,",
+    )
+    session.add(adresse)
+    session.flush()
+    anrede, vorname, nachname, funktion = kontakt
+    session.add(
+        Ansprechpartner(
+            adresse_id=adresse.id, anrede=anrede, vorname=vorname, nachname=nachname,
+            funktion=funktion, telefon=telefon, email=email, ist_hauptkontakt=True,
+        )
+    )
+    session.flush()
+    adresse_service.synchronisiere_hauptkontakt(session, adresse)
+
+
 def seed_adressen(session: Session) -> None:
-    for firma, ap, strasse, plz, ort, uid in KUNDEN:
-        if session.exec(select(Adresse).where(Adresse.firma == firma)).first():
-            continue
+    for daten in KUNDEN:
+        _seed_adresse(session, AdressTyp.KUNDE, daten, 14)
+    for daten in LIEFERANTEN:
+        _seed_adresse(session, AdressTyp.LIEFERANT, daten, 30)
+    # Demo: eine Lieferadresse (Baustelle) beim Bauträger
+    steiner = _hole_kunde(session, "Wohnbau Steiner GmbH")
+    vorhanden = select(Lieferadresse).where(Lieferadresse.adresse_id == steiner.id)
+    if not session.exec(vorhanden).first():
         session.add(
-            Adresse(
-                typ=AdressTyp.KUNDE, firma=firma, ansprechpartner=ap,
-                strasse=strasse, plz=plz, ort=ort, uid=uid, zahlungsziel_tage=14,
+            Lieferadresse(
+                adresse_id=steiner.id, bezeichnung="Baustelle Wohnpark Süd",
+                name="Wohnbau Steiner GmbH, Bauleitung", strasse="Am Wohnpark 1", plz="8020",
+                ort="Graz", notiz="Anlieferung Mo–Fr 7–15 Uhr, Polier Hr. Rauch 0664 111222",
             )
         )
-    for firma, ap, strasse, plz, ort, uid in LIEFERANTEN:
-        if session.exec(select(Adresse).where(Adresse.firma == firma)).first():
-            continue
-        session.add(
-            Adresse(
-                typ=AdressTyp.LIEFERANT, firma=firma, ansprechpartner=ap,
-                strasse=strasse, plz=plz, ort=ort, uid=uid, zahlungsziel_tage=30,
-            )
-        )
+        session.flush()
 
 
 def _kalkulation(ek: Decimal, vk: Decimal) -> dict:

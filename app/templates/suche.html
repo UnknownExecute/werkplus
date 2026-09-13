@@ -15,11 +15,12 @@
   {% if adressen %}
   <table class="table table-hover tabelle-kompakt">
     <thead>
-      <tr><th>Firma</th><th>Ansprechpartner</th><th>Ort</th><th>UID</th></tr>
+      <tr><th>Nummer</th><th>Firma</th><th>Ansprechpartner</th><th>Ort</th><th>UID</th></tr>
     </thead>
     <tbody>
       {% for adresse in adressen %}
       <tr>
+        <td><a href="/adressen/{{ adresse.id }}">{{ adresse.adressnr }}</a></td>
         <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
         <td>{{ adresse.ansprechpartner }}</td>
         <td>{{ adresse.ort }}</td>

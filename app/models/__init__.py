@@ -1,7 +1,7 @@
 """Alle Entities — Import hier stellt sicher, dass SQLModel.metadata vollständig ist."""
 
-from app.models.adresse import Adresse, AdressTyp
-from app.models.aktivitaet import Aktivitaet, AktivitaetTyp
+from app.models.adresse import Adresse, AdressTyp, Ansprechpartner, Lieferadresse
+from app.models.aktivitaet import AKTIVITAET_LABELS, Aktivitaet, AktivitaetTyp
 from app.models.anlage import Anlage, Serviceeinsatz
 from app.models.artikel import UST_SAETZE, Artikel
 from app.models.beleg import (
@@ -37,10 +37,13 @@ __all__ = [
     "UST_SAETZE",
     "Angebotsergebnis",
     "Auftragsart",
+    "AKTIVITAET_LABELS",
     "Adresse",
     "AdressTyp",
     "Aktivitaet",
     "AktivitaetTyp",
+    "Ansprechpartner",
+    "Lieferadresse",
     "Anlage",
     "Artikel",
     "Beleg",

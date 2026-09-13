@@ -79,6 +79,14 @@
           <tr><th>Belegart</th><th style="width:12rem">Letzte Nummer (Stand)</th><th>Nächste Belegnummer</th></tr>
         </thead>
         <tbody>
+          <tr>
+            <td>Adressen (Adressnummer)</td>
+            <td>
+              <input class="form-control form-control-sm" type="number" min="{{ adressnr_stand }}" step="1"
+                     name="stand_adresse" id="stand_adresse" value="{{ adressnr_stand }}" aria-label="Stand Adressen">
+            </td>
+            <td><code>{{ adressnr_stand + 1 }}</code></td>
+          </tr>
           {% for art, label, stand, naechste in nk_zeilen %}
           <tr>
             <td>{{ label }}</td>

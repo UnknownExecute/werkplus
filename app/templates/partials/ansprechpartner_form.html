@@ -1,0 +1,71 @@
+{# Formular Ansprechpartner: kontakt=None → neu anlegen, sonst bearbeiten. Erwartet: adresse, anreden #}
+{% set k = kontakt %}
+<form class="card" hx-post="/adressen/{{ adresse.id }}/ansprechpartner{% if k %}/{{ k.id }}{% endif %}"
+      hx-target="#ansprechpartner-bereich" hx-swap="innerHTML">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-12"><h3 class="h6 mb-0">{% if k %}Ansprechpartner bearbeiten{% else %}Neuer Ansprechpartner{% endif %}</h3></div>
+    <div class="col-md-2">
+      <label class="form-label">Anrede</label>
+      <select class="form-select form-select-sm" name="anrede">
+        {% for a in anreden if a != "Firma" %}
+        <option value="{{ a }}" {% if k and k.anrede == a %}selected{% endif %}>{{ a or "–" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Vorname</label>
+      <input class="form-control form-control-sm" type="text" name="vorname" value="{{ k.vorname if k else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Nachname *</label>
+      <input class="form-control form-control-sm" type="text" name="nachname" value="{{ k.nachname if k else '' }}" required>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Funktion</label>
+      <input class="form-control form-control-sm" type="text" name="funktion" value="{{ k.funktion if k else '' }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Abteilung</label>
+      <input class="form-control form-control-sm" type="text" name="abteilung" value="{{ k.abteilung if k else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Telefon</label>
+      <input class="form-control form-control-sm" type="tel" name="telefon" value="{{ k.telefon if k else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Mobil</label>
+      <input class="form-control form-control-sm" type="tel" name="mobil" value="{{ k.mobil if k else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">E-Mail</label>
+      <input class="form-control form-control-sm" type="email" name="email" value="{{ k.email if k else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Notiz</label>
+      <input class="form-control form-control-sm" type="text" name="notiz" value="{{ k.notiz if k else '' }}">
+    </div>
+    <div class="col-md-6 d-flex gap-3">
+      <label class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" name="ist_hauptkontakt" value="true"
+               {% if k and k.ist_hauptkontakt %}checked{% endif %}>
+        <span class="form-check-label">Hauptansprechpartner</span>
+      </label>
+      {% if k %}
+      <label class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" name="aktiv" value="true" {% if k.aktiv %}checked{% endif %}>
+        <span class="form-check-label">Aktiv</span>
+      </label>
+      {% else %}
+      <input type="hidden" name="aktiv" value="true">
+      {% endif %}
+    </div>
+    <div class="col-md-6 text-md-end">
+      <button class="btn btn-sm btn-primary" type="submit">{% if k %}Speichern{% else %}Hinzufügen{% endif %}</button>
+      {% if k %}
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+              hx-get="/adressen/{{ adresse.id }}/ansprechpartner/{{ k.id }}/form?abbrechen=1"
+              onclick="this.closest('form').reset(); this.closest('form').querySelectorAll('input[type=text],input[type=tel],input[type=email]').forEach(function(i){i.value=''}); return false;">Abbrechen</button>
+      {% endif %}
+    </div>
+  </div>
+</form>

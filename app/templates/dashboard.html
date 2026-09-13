@@ -51,6 +51,35 @@
     </div>
   </div>
 
+  {% if darf_bereich(request, 'adressen') %}
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Wiedervorlage fällig <span class="badge {% if wiedervorlagen_anzahl %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ wiedervorlagen_anzahl }}</span></span>
+        <a href="/wiedervorlage">Alle Wiedervorlagen</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover tabelle-kompakt mb-0">
+          <thead>
+            <tr><th>Datum</th><th>Adresse</th><th>Betreff</th></tr>
+          </thead>
+          <tbody>
+            {% for a, adresse in wiedervorlagen %}
+            <tr {% if a.wiedervorlage_am < heute %}class="table-danger"{% endif %}>
+              <td class="text-nowrap">{{ a.wiedervorlage_am | datum }}</td>
+              <td><a href="/adressen/{{ adresse.id }}?tab=aktivitaeten">{{ adresse.firma }}</a></td>
+              <td>{{ a.betreff }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted">Nichts fällig.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
