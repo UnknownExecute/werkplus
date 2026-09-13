@@ -80,9 +80,9 @@ def test_seed_demo_durchlauf_legt_belegkette_und_anlagen_an(session):
 
     # Angebot→Auftrag→Lieferschein→Rechnung = 4 Belege + Regie-Auftrag (Zeiterfassung)
     assert session.exec(select(func.count()).select_from(Beleg)).one() == 5
-    # 2 Demo-Anlagen (eine fällig, eine überfällig)
+    # 2 Demo-Anlagen (eine fällig, eine überfällig) + 1 freie Fremdanlage mit Vertrag
     anlagen = session.exec(select(Anlage)).all()
-    assert len(anlagen) == 2
+    assert len(anlagen) == 3
     assert all(a.naechste_wartung is not None for a in anlagen)
 
 
@@ -124,5 +124,5 @@ def test_seed_ist_idempotent(session):
     # 15 Stammdaten-SNs + 2 Demo-Anlagen-SNs, auch nach zweitem Lauf
     assert session.exec(select(func.count()).select_from(Seriennummer)).one() == 17
     assert session.exec(select(func.count()).select_from(Beleg)).one() == 5
-    assert session.exec(select(func.count()).select_from(Anlage)).one() == 2
+    assert session.exec(select(func.count()).select_from(Anlage)).one() == 3
     assert session.exec(select(func.count()).select_from(Zeiterfassung)).one() == 3

@@ -7,17 +7,20 @@
   {% set zeilen_klasse = "" %}
 {% endif %}
 <tr class="{{ zeilen_klasse }}">
-  <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
-  <td>{{ artikel.bezeichnung }}</td>
-  <td><a href="/anlagen/{{ anlage.id }}">{{ sn.sn }}</a></td>
-  <td>{{ anlage.standort }}</td>
-  <td>{{ anlage.inbetriebnahme | datum }}</td>
-  <td>{{ anlage.garantieende | datum }}</td>
+  <td class="text-nowrap"><a href="/anlagen/{{ anlage.id }}" class="fw-semibold">{{ anlage.anlagenr }}</a></td>
   <td>
-    {{ anlage.naechste_wartung | datum }}
-    {% if not anlage.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
+    <a href="/anlagen/{{ anlage.id }}">{{ anlage.bezeichnung.splitlines()[0] if anlage.bezeichnung else (artikel.bezeichnung if artikel else "Anlage " ~ anlage.anlagenr) }}</a>
+    {% if anlage.art %}<span class="badge text-bg-light border ms-1">{{ anlage.art }}</span>{% endif %}
+    {% if not anlage.aktiv %}<span class="badge text-bg-secondary ms-1">inaktiv</span>{% endif %}
   </td>
+  <td><a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a></td>
+  <td>{{ anlage.hersteller }}{% if anlage.hersteller and anlage.typ %} / {% endif %}{{ anlage.typ }}</td>
+  <td>{{ anlage.seriennummer_text or (sn.sn if sn else "") }}</td>
+  <td>{{ anlage.standort }}</td>
+  <td class="text-nowrap">{{ anlage.inbetriebnahme | datum }}</td>
+  <td class="text-nowrap">{{ anlage.naechste_wartung | datum }}</td>
+  <td class="text-nowrap">{{ anlage.vertrag_bis | datum }}{% if anlage.hat_wartungsvertrag and not anlage.vertrag_bis %}<span class="badge text-bg-light border">Vertrag</span>{% endif %}</td>
 </tr>
 {% else %}
-<tr><td colspan="7" class="text-muted">Keine Anlagen gefunden.</td></tr>
+<tr><td colspan="9" class="text-muted">Keine Anlagen gefunden.</td></tr>
 {% endfor %}

@@ -83,6 +83,8 @@ class Beleg(SQLModel, table=True):
     # Abweichende Lieferadresse (Tabelle lieferadresse); ohne FK-Constraint, weil
     # SQLite-Batch-Migrationen an neuen FKs der beleg-Tabelle scheitern können.
     lieferadresse_id: int | None = Field(default=None, index=True)
+    # Bezug zur Anlage beim Kunden (Kplus „Auftrag aus Anlage"); ohne FK, s. o.
+    anlage_id: int | None = Field(default=None, index=True)
     auftragsart: str = Field(default="", index=True)
     angebotsergebnis: str = Field(default="", index=True)
     kopftext: str = ""

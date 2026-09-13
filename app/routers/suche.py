@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.dependencies import get_current_user
-from app.models import Adresse, Artikel, Beleg, Benutzer
+from app.models import Adresse, Anlage, Artikel, Beleg, Benutzer
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS, _bereich_fuer
 from app.services.berechtigung import darf_bereich
 from app.templating import templates
@@ -51,6 +51,23 @@ def _suche_artikel(session: Session, muster: str) -> list[Artikel]:
     return list(session.exec(stmt).all())
 
 
+def _suche_anlagen(session: Session, muster: str) -> list[tuple[Anlage, Adresse]]:
+    stmt = (
+        select(Anlage, Adresse)
+        .join(Adresse, Anlage.adresse_id == Adresse.id)  # type: ignore[arg-type]
+        .where(
+            Anlage.anlagenr.ilike(muster)  # type: ignore[attr-defined]
+            | Anlage.bezeichnung.ilike(muster)  # type: ignore[attr-defined]
+            | Anlage.hersteller.ilike(muster)  # type: ignore[attr-defined]
+            | Anlage.typ.ilike(muster)  # type: ignore[attr-defined]
+            | Anlage.seriennummer_text.ilike(muster)  # type: ignore[attr-defined]
+        )
+        .order_by(Anlage.id.desc())  # type: ignore[union-attr]
+        .limit(MAX_TREFFER)
+    )
+    return list(session.exec(stmt).all())
+
+
 def _suche_belege(session: Session, muster: str) -> list[tuple[Beleg, Adresse]]:
     stmt = (
         select(Beleg, Adresse)
@@ -75,6 +92,7 @@ def suche(
     begriff = q.strip()
     adressen: list[Adresse] = []
     artikel: list[Artikel] = []
+    anlagen: list[tuple[Anlage, Adresse]] = []
     belege: list[tuple[Beleg, Adresse]] = []
     if len(begriff) >= MIN_LAENGE:
         muster = f"%{begriff}%"
@@ -84,6 +102,8 @@ def suche(
             adressen = _suche_adressen(session, muster)
         if darf_bereich(request, "artikel"):
             artikel = _suche_artikel(session, muster)
+        if darf_bereich(request, "anlagen"):
+            anlagen = _suche_anlagen(session, muster)
         belege = [
             (beleg, adresse)
             for beleg, adresse in _suche_belege(session, muster)
@@ -96,6 +116,7 @@ def suche(
             "q": q,
             "adressen": adressen,
             "artikel": artikel,
+            "anlagen": anlagen,
             "belege": belege,
             "belegart_labels": BELEGART_LABELS,
             "status_labels": STATUS_LABELS,

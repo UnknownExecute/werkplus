@@ -20,6 +20,7 @@
       {% endif %}
     </h1>
     {% if beleg.betreff %}<div class="text-muted">{{ beleg.betreff }}</div>{% endif %}
+    {% if anlage %}<div class="small">Anlage: <a href="/anlagen/{{ anlage.id }}">{{ anlage.anlagenr }} {{ anlage.kurz }}</a></div>{% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
     {% if beleg.ist_muster %}

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Anlagenblatt {{ anlage.anlagenr }}</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; font-size: 11pt; color: #111; margin: 1.5cm; }
+  h1 { font-size: 16pt; margin: 0 0 .2cm; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: .05em; color: #555; margin: .8cm 0 .2cm; border-bottom: 1px solid #999; }
+  .kopf { display: flex; justify-content: space-between; font-size: 9pt; color: #555; margin-bottom: .6cm; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { text-align: left; vertical-align: top; padding: 3pt 6pt; border-bottom: 1px solid #ddd; font-size: 10pt; }
+  th { width: 32%; color: #555; font-weight: normal; }
+  .zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1cm; }
+  .druck { position: fixed; top: .5cm; right: .5cm; }
+  @media print { .druck { display: none; } body { margin: 1cm; } }
+</style>
+</head>
+<body>
+<button class="druck" onclick="window.print()">Drucken</button>
+<div class="kopf"><span>{{ firma.name }} · Anlagenblatt</span><span>Stand {{ heute | datum }}</span></div>
+<h1>Anlage {{ anlage.anlagenr }} – {{ anlage.kurz }}</h1>
+<div>Kunde: <strong>{{ adresse.adressnr }} {{ adresse.firma }}</strong>, {{ adresse.strasse }}, {{ adresse.plz }} {{ adresse.ort }}
+  {% if adresse.telefon %} · Tel. {{ adresse.telefon }}{% endif %}</div>
+
+<h2>Anlagedaten</h2>
+<div class="zwei">
+  <table>
+    <tr><th>Bezeichnung</th><td style="white-space:pre-line">{{ anlage.bezeichnung }}</td></tr>
+    <tr><th>Hersteller / Typ</th><td>{{ anlage.hersteller }} {{ anlage.typ }}</td></tr>
+    <tr><th>Seriennummer</th><td>{{ anlage.seriennummer_text }}</td></tr>
+    <tr><th>Art / Gruppe</th><td>{{ anlage.art }}{% if anlage.anlagengruppe %} / {{ anlage.anlagengruppe }}{% endif %}{% if anlage.untergruppe %} / {{ anlage.untergruppe }}{% endif %}</td></tr>
+    <tr><th>Kostenstelle</th><td>{{ anlage.kostenstelle }}</td></tr>
+    <tr><th>Standort</th><td>{{ anlage.standort }}</td></tr>
+  </table>
+  <table>
+    <tr><th>Herstellungsdatum</th><td>{{ anlage.herstellungsdatum | datum }}</td></tr>
+    <tr><th>Installation</th><td>{{ anlage.inbetriebnahme | datum }}</td></tr>
+    <tr><th>Garantie bis</th><td>{{ anlage.garantieende | datum }}</td></tr>
+    <tr><th>Ansprechpartner</th><td>{{ ansprechpartner.anzeigename if ansprechpartner else '' }}</td></tr>
+    <tr><th>Lieferant</th><td>{{ lieferant.firma if lieferant else '' }}</td></tr>
+    <tr><th>Nächste Wartung</th><td>{{ anlage.naechste_wartung | datum }}{% if anlage.wartungsintervall_monate %} (alle {{ anlage.wartungsintervall_monate }} Monate){% endif %}</td></tr>
+  </table>
+</div>
+{% if anlage.technische_info %}<h2>Technische Information</h2><div style="white-space:pre-line">{{ anlage.technische_info }}</div>{% endif %}
+
+{% if anlage.hat_wartungsvertrag %}
+<h2>Wartungsvertrag</h2>
+<table>
+  <tr><th>Vertragsnummer</th><td>{{ anlage.vertrag_nr }}</td></tr>
+  <tr><th>Laufzeit</th><td>{{ anlage.vertrag_von | datum }} – {{ anlage.vertrag_bis | datum }}</td></tr>
+  <tr><th>Pauschale netto / Jahr</th><td>{{ anlage.vertrag_pauschale | euro }} €</td></tr>
+  <tr><th>Leistungsumfang</th><td>{{ anlage.vertrag_notiz }}</td></tr>
+</table>
+{% endif %}
+
+<h2>Komponenten</h2>
+<table>
+  <tr><th style="width:auto">Komponente</th><th style="width:auto">Hersteller / Typ</th><th style="width:auto">Seriennummer</th><th style="width:auto">Einbau</th></tr>
+  {% for k in komponenten %}
+  <tr><td>{{ k.bezeichnung }}</td><td>{{ k.hersteller }} {{ k.typ }}</td><td>{{ k.seriennummer_text }}</td><td>{{ k.einbaudatum | datum }}</td></tr>
+  {% else %}
+  <tr><td colspan="4">keine</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Servicehistorie</h2>
+<table>
+  <tr><th style="width:auto">Datum</th><th style="width:auto">Beschreibung</th><th style="width:auto">Erfasst von</th></tr>
+  {% for einsatz, benutzer in einsaetze %}
+  <tr><td>{{ einsatz.datum | datum }}</td><td>{{ einsatz.beschreibung }}</td><td>{{ benutzer.name if benutzer else '' }}</td></tr>
+  {% else %}
+  <tr><td colspan="3">keine Einsätze</td></tr>
+  {% endfor %}
+</table>
+</body>
+</html>

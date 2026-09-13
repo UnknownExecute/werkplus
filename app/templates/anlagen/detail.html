@@ -1,50 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Anlage {{ sn.sn }}{% endblock %}
+{% block title %}Anlage {{ anlage.anlagenr }}{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 mb-0">
-    Anlage {{ artikel.bezeichnung }} — SN {{ sn.sn }}
-    {% if not anlage.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
-  </h1>
-  <a class="btn btn-outline-secondary" href="/anlagen">Zur Liste</a>
+{# Kplus-Anlagenstamm: Reiter Anlagedaten | Wartung | Komponenten | Wartungsvertrag | Belege;
+   Knöpfe Belege, Druck (Anlagenblatt), Auftrag #}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small text-decoration-none" href="/anlagen">&larr; Anlagen</a>
+    <h1 class="h3 mb-0">
+      <span class="text-muted">{{ anlage.anlagenr }}</span> {{ anlage.kurz }}
+      {% if anlage.art %}<span class="badge text-bg-light border">{{ anlage.art }}</span>{% endif %}
+      {% if anlage.hat_wartungsvertrag %}<span class="badge text-bg-info text-dark">Wartungsvertrag</span>{% endif %}
+      {% if not anlage.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
+    </h1>
+    <div class="text-muted small">
+      Kunde: <a href="/adressen/{{ adresse.id }}"><strong>{{ adresse.adressnr }} {{ adresse.firma }}</strong></a>
+      {% if anlage.hersteller or anlage.typ %} &middot; {{ anlage.hersteller }} {{ anlage.typ }}{% endif %}
+      {% if anlage.seriennummer_text %} &middot; SN {{ anlage.seriennummer_text }}{% endif %}
+      {% if artikel %} &middot; Artikel <a href="/artikel/{{ artikel.id }}">{{ artikel.artikelnr }}</a>{% endif %}
+      {% if anlage.naechste_wartung %} &middot; Nächste Wartung
+        <span class="{% if anlage.naechste_wartung < heute %}text-danger fw-semibold{% endif %}">{{ anlage.naechste_wartung | datum }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if darf_verkauf %}
+    <form method="post" action="/anlagen/{{ anlage.id }}/auftrag" class="d-flex gap-1">
+      <select class="form-select form-select-sm" name="auftragsart" aria-label="Auftragsart" style="width:auto">
+        {% for a in auftragsarten %}<option value="{{ a }}" {% if a == 'service' %}selected{% endif %}>{{ auftragsart_labels[a] }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm btn-primary text-nowrap" type="submit">Auftrag erstellen</button>
+    </form>
+    <form method="post" action="/anlagen/{{ anlage.id }}/auftrag">
+      <input type="hidden" name="belegart" value="angebot">
+      <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">Angebot erstellen</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="/anlagen/{{ anlage.id }}/blatt" target="_blank">Anlagenblatt drucken</a>
+  </div>
 </div>
 
-<p>
-  Kunde: <a href="/adressen/{{ adresse.id }}"><strong>{{ adresse.firma }}</strong></a>
-  &middot; Artikel: <a href="/artikel/{{ artikel.id }}">{{ artikel.artikelnr }}</a>
-</p>
+{% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
 
-<div class="row">
-  <div class="col-lg-5">
-    <h2 class="h5">Stammdaten</h2>
+{% set tab = aktiver_tab | default('daten') %}
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link {% if tab == 'daten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-daten" type="button">Anlagedaten</button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'wartung' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-wartung" type="button">Wartung <span class="badge rounded-pill text-bg-secondary">{{ einsaetze | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'komponenten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-komponenten" type="button">Komponenten <span class="badge rounded-pill text-bg-secondary">{{ komponenten | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'vertrag' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-vertrag" type="button">Wartungsvertrag</button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'belege' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-belege" type="button">Belege <span class="badge rounded-pill text-bg-secondary">{{ belege | length }}</span></button></li>
+</ul>
+
+<div class="tab-content">
+  {# ------------------------------------------------------------ Anlagedaten #}
+  <div class="tab-pane fade {% if tab == 'daten' %}show active{% endif %}" id="tab-daten">
     <form method="post" action="/anlagen/{{ anlage.id }}">
-      <div class="mb-2">
-        <label class="form-label">Standort</label>
-        <input class="form-control" name="standort" value="{{ anlage.standort }}">
-      </div>
-      <div class="row g-2">
-        <div class="col-md-4">
-          <label class="form-label">Inbetriebnahme</label>
-          <input class="form-control" type="date" name="inbetriebnahme"
-                 value="{{ anlage.inbetriebnahme or '' }}">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Garantieende</label>
-          <input class="form-control" type="date" name="garantieende"
-                 value="{{ anlage.garantieende or '' }}">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Nächste Wartung</label>
-          <input class="form-control" type="date" name="naechste_wartung"
-                 id="stamm-naechste-wartung" value="{{ anlage.naechste_wartung or '' }}">
-        </div>
-      </div>
-      <div class="my-2">
-        <label class="form-label">Notizen</label>
-        <textarea class="form-control" name="notizen" rows="3">{{ anlage.notizen }}</textarea>
-      </div>
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" name="aktiv" id="aktiv"
+      <input type="hidden" name="tab" value="daten">
+      {% include "partials/anlage_stammfelder.html" %}
+      {# Wartungs- und Vertragsfelder als Hidden, damit ein Speichern hier sie nicht leert #}
+      <input type="hidden" name="naechste_wartung" value="{{ anlage.naechste_wartung or '' }}">
+      <input type="hidden" name="wartungsintervall_monate" value="{{ anlage.wartungsintervall_monate }}">
+      <input type="hidden" name="vertrag_nr" value="{{ anlage.vertrag_nr }}">
+      <input type="hidden" name="vertrag_von" value="{{ anlage.vertrag_von or '' }}">
+      <input type="hidden" name="vertrag_bis" value="{{ anlage.vertrag_bis or '' }}">
+      <input type="hidden" name="vertrag_pauschale" value="{{ anlage.vertrag_pauschale | menge }}">
+      <input type="hidden" name="vertrag_notiz" value="{{ anlage.vertrag_notiz }}">
+      <div class="form-check my-3">
+        <input class="form-check-input" type="checkbox" name="aktiv" id="aktiv" value="true"
                {% if anlage.aktiv %}checked{% endif %}>
         <label class="form-check-label" for="aktiv">Aktiv</label>
       </div>
@@ -52,30 +72,131 @@
     </form>
   </div>
 
-  <div class="col-lg-7">
-    <h2 class="h5">Serviceeinsatz erfassen</h2>
-    <form hx-post="/anlagen/{{ anlage.id }}/serviceeinsatz"
-          hx-target="#servicehistorie" hx-swap="outerHTML"
-          class="row g-2 align-items-end mb-3">
-      <div class="col-md-3">
-        <label class="form-label">Datum</label>
-        <input class="form-control" type="date" name="datum" value="{{ heute }}" required>
+  {# ---------------------------------------------------------------- Wartung #}
+  <div class="tab-pane fade {% if tab == 'wartung' %}show active{% endif %}" id="tab-wartung">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <h2 class="h6 text-muted text-uppercase">Wartungsplanung</h2>
+        <form method="post" action="/anlagen/{{ anlage.id }}">
+          <input type="hidden" name="tab" value="wartung">
+          {% for name in ('bezeichnung','kostenstelle','hersteller','typ','seriennummer_text','standort','technische_info','art','anlagengruppe','untergruppe','notizen','vertrag_nr','vertrag_notiz') %}
+          <input type="hidden" name="{{ name }}" value="{{ anlage[name] }}">
+          {% endfor %}
+          {% for name in ('herstellungsdatum','inbetriebnahme','garantieende','vertrag_von','vertrag_bis') %}
+          <input type="hidden" name="{{ name }}" value="{{ anlage[name] or '' }}">
+          {% endfor %}
+          <input type="hidden" name="ansprechpartner_id" value="{{ anlage.ansprechpartner_id or '' }}">
+          <input type="hidden" name="lieferant_id" value="{{ anlage.lieferant_id or '' }}">
+          <input type="hidden" name="vertrag_pauschale" value="{{ anlage.vertrag_pauschale | menge }}">
+          <input type="hidden" name="aktiv" value="{{ 'true' if anlage.aktiv else '' }}">
+          <div class="mb-2">
+            <label class="form-label">Nächste Wartung</label>
+            <input class="form-control" type="date" name="naechste_wartung"
+                   id="stamm-naechste-wartung" value="{{ anlage.naechste_wartung or '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Wartungsintervall (Monate)</label>
+            <input class="form-control" type="number" name="wartungsintervall_monate" min="0"
+                   value="{{ anlage.wartungsintervall_monate }}">
+            <div class="form-text">Mit Intervall setzt jeder Serviceeinsatz den nächsten Termin automatisch (Einsatzdatum + Intervall).</div>
+          </div>
+          <button class="btn btn-outline-primary" type="submit">Wartungsplanung speichern</button>
+        </form>
       </div>
-      <div class="col-md-4">
-        <label class="form-label">Beschreibung</label>
-        <input class="form-control" name="beschreibung"
-               placeholder="z. B. Jahreswartung durchgeführt" required>
+      <div class="col-lg-8">
+        <h2 class="h6 text-muted text-uppercase">Serviceeinsatz erfassen</h2>
+        <form hx-post="/anlagen/{{ anlage.id }}/serviceeinsatz"
+              hx-target="#servicehistorie" hx-swap="outerHTML"
+              class="row g-2 align-items-end mb-3">
+          <div class="col-md-3">
+            <label class="form-label">Datum</label>
+            <input class="form-control" type="date" name="datum" value="{{ heute }}" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Beschreibung</label>
+            <input class="form-control" name="beschreibung"
+                   placeholder="z. B. Jahreswartung durchgeführt" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Neuer Wartungstermin</label>
+            <input class="form-control" type="date" name="naechste_wartung"
+                   placeholder="{% if anlage.wartungsintervall_monate %}automatisch{% endif %}">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="submit">Erfassen</button>
+          </div>
+        </form>
+        {% include "partials/serviceeinsaetze.html" %}
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Neuer Wartungstermin</label>
-        <input class="form-control" type="date" name="naechste_wartung">
-      </div>
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100" type="submit">Erfassen</button>
-      </div>
-    </form>
+    </div>
+  </div>
 
-    {% include "partials/serviceeinsaetze.html" %}
+  {# ------------------------------------------------------------ Komponenten #}
+  <div class="tab-pane fade {% if tab == 'komponenten' %}show active{% endif %}" id="tab-komponenten">
+    <div id="komponenten-bereich">
+      {% include "partials/anlage_komponenten.html" %}
+    </div>
+  </div>
+
+  {# --------------------------------------------------------- Wartungsvertrag #}
+  <div class="tab-pane fade {% if tab == 'vertrag' %}show active{% endif %}" id="tab-vertrag">
+    <form method="post" action="/anlagen/{{ anlage.id }}" class="col-lg-8">
+      <input type="hidden" name="tab" value="vertrag">
+      {% for name in ('bezeichnung','kostenstelle','hersteller','typ','seriennummer_text','standort','technische_info','art','anlagengruppe','untergruppe','notizen') %}
+      <input type="hidden" name="{{ name }}" value="{{ anlage[name] }}">
+      {% endfor %}
+      {% for name in ('herstellungsdatum','inbetriebnahme','garantieende','naechste_wartung') %}
+      <input type="hidden" name="{{ name }}" value="{{ anlage[name] or '' }}">
+      {% endfor %}
+      <input type="hidden" name="ansprechpartner_id" value="{{ anlage.ansprechpartner_id or '' }}">
+      <input type="hidden" name="lieferant_id" value="{{ anlage.lieferant_id or '' }}">
+      <input type="hidden" name="wartungsintervall_monate" value="{{ anlage.wartungsintervall_monate }}">
+      <input type="hidden" name="aktiv" value="{{ 'true' if anlage.aktiv else '' }}">
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label">Vertragsnummer</label>
+          <input class="form-control" name="vertrag_nr" value="{{ anlage.vertrag_nr }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Vertrag von</label>
+          <input class="form-control" type="date" name="vertrag_von" value="{{ anlage.vertrag_von or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Vertrag bis</label>
+          <input class="form-control" type="date" name="vertrag_bis" value="{{ anlage.vertrag_bis or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Pauschale netto / Jahr</label>
+          <input class="form-control" name="vertrag_pauschale" inputmode="decimal" value="{{ anlage.vertrag_pauschale | menge }}">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Vertragsnotiz (Leistungsumfang)</label>
+          <input class="form-control" name="vertrag_notiz" value="{{ anlage.vertrag_notiz }}">
+        </div>
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">Wartungsvertrag speichern</button>
+    </form>
+  </div>
+
+  {# ------------------------------------------------------------------ Belege #}
+  <div class="tab-pane fade {% if tab == 'belege' %}show active{% endif %}" id="tab-belege">
+    <table class="table table-hover tabelle-kompakt">
+      <thead><tr><th>Belegnr</th><th>Belegart</th><th>Datum</th><th>Betreff</th><th>Status</th><th class="text-end">Brutto</th></tr></thead>
+      <tbody>
+        {% for beleg in belege %}
+        <tr>
+          <td><a href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
+          <td>{{ belegart_labels[beleg.belegart] }}</td>
+          <td>{{ beleg.datum | datum }}</td>
+          <td>{{ beleg.betreff }}</td>
+          <td><span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span></td>
+          <td class="text-end">{{ beleg.summe_brutto | euro }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted">Noch keine Belege zu dieser Anlage. Mit „Auftrag erstellen“ entsteht ein Serviceauftrag mit Anlagenbezug.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

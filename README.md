@@ -249,6 +249,15 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
   den Lieferanten-EK), Staffelpreise (greifen im Beleg nach Menge), Bestand mit
   Gesamt/Reserviert/Bestellt/Verfügbar; „letzter EK / letzter Lieferant" aus
   der gebuchten EK-Rechnung
+- Anlagenstamm im Kplus-Stil: Anlagenummer (ab 1001), Anlagebezeichnung,
+  Kostenstelle, Hersteller, Typ, Seriennummer als Text, Ansprechpartner,
+  Lieferant, Herstellungs-/Installationsdatum, Garantie, Standort, Technische
+  Information, Art/Anlagengruppe/Untergruppe — Lagerartikel und Lager-SN sind
+  optional (Fremd- und Altgeräte frei erfassbar); Reiter Wartung (Intervall
+  schreibt den nächsten Termin nach jedem Serviceeinsatz fort), Komponenten,
+  Wartungsvertrag (Nummer, Laufzeit, Pauschale), Belege; Anlagensuche mit
+  Filtern; „Auftrag/Angebot aus Anlage" mit Anlagenbezug am Beleg; Anlagenblatt
+  als Druckansicht
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG

@@ -57,6 +57,30 @@
 </section>
 
 <section class="mb-4">
+  <h2 class="h5">Anlagen <span class="badge bg-secondary">{{ anlagen | length }}</span></h2>
+  {% if anlagen %}
+  <table class="table table-hover tabelle-kompakt">
+    <thead>
+      <tr><th>Nummer</th><th>Anlage</th><th>Hersteller / Typ</th><th>SN</th><th>Kunde</th></tr>
+    </thead>
+    <tbody>
+      {% for anlage, adresse in anlagen %}
+      <tr>
+        <td><a href="/anlagen/{{ anlage.id }}">{{ anlage.anlagenr }}</a></td>
+        <td>{{ anlage.kurz }}</td>
+        <td>{{ anlage.hersteller }} {{ anlage.typ }}</td>
+        <td>{{ anlage.seriennummer_text }}</td>
+        <td>{{ adresse.firma }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">Keine Anlagen gefunden.</p>
+  {% endif %}
+</section>
+
+<section class="mb-4">
   <h2 class="h5">Belege <span class="badge bg-secondary">{{ belege | length }}</span></h2>
   {% if belege %}
   <table class="table table-hover tabelle-kompakt">

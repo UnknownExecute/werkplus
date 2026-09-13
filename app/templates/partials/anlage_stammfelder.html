@@ -1,0 +1,102 @@
+{# Anlagedaten im Kplus-Zuschnitt (neu + bearbeiten). Erwartet: anlage (oder none), kontakte,
+   lieferanten, arten, sn (optional), artikel (optional) #}
+{% set a = anlage %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="row g-2">
+      <div class="col-md-3">
+        <label class="form-label">Anlagenummer</label>
+        <input class="form-control" value="{{ a.anlagenr if a else 'automatisch' }}" disabled>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label" for="anl-bezeichnung">Anlagebezeichnung {% if not a or not a.artikel_id %}*{% endif %}</label>
+        <textarea class="form-control" id="anl-bezeichnung" name="bezeichnung" rows="2"
+                  placeholder="z. B. Gastherme Vaillant ecoTEC plus, Dachgeschoss">{{ a.bezeichnung if a else '' }}</textarea>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="anl-kostenstelle">Kostenstelle</label>
+        <input class="form-control" id="anl-kostenstelle" name="kostenstelle" value="{{ a.kostenstelle if a else '' }}">
+      </div>
+      <div class="col-md-9">
+        <label class="form-label" for="anl-standort">Standort der Anlage</label>
+        <input class="form-control" id="anl-standort" name="standort" value="{{ a.standort if a else '' }}"
+               placeholder="z. B. Heizraum Keller">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="anl-technik">Technische Information</label>
+        <textarea class="form-control" id="anl-technik" name="technische_info" rows="3">{{ a.technische_info if a else '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="anl-notizen">Notizen</label>
+        <textarea class="form-control" id="anl-notizen" name="notizen" rows="2">{{ a.notizen if a else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="row g-2">
+      <div class="col-md-6">
+        <label class="form-label" for="anl-hersteller">Hersteller</label>
+        <input class="form-control" id="anl-hersteller" name="hersteller" value="{{ a.hersteller if a else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-typ">Typ</label>
+        <input class="form-control" id="anl-typ" name="typ" value="{{ a.typ if a else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-sn">Seriennummer</label>
+        <input class="form-control" id="anl-sn" name="seriennummer_text" value="{{ a.seriennummer_text if a else '' }}"
+               {% if a and a.seriennummer_id %}readonly title="aus dem Lagerstamm"{% endif %}>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-herstellung">Herstellungsdatum</label>
+        <input class="form-control" type="date" id="anl-herstellung" name="herstellungsdatum"
+               value="{{ a.herstellungsdatum or '' if a else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-inbetriebnahme">Installationsdatum</label>
+        <input class="form-control" type="date" id="anl-inbetriebnahme" name="inbetriebnahme"
+               value="{{ a.inbetriebnahme or '' if a else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-garantie">Garantie bis</label>
+        <input class="form-control" type="date" id="anl-garantie" name="garantieende"
+               value="{{ a.garantieende or '' if a else '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-ansprechpartner">Ansprechpartner</label>
+        <select class="form-select" id="anl-ansprechpartner" name="ansprechpartner_id">
+          <option value="">–</option>
+          {% for k in kontakte %}
+          <option value="{{ k.id }}" {% if a and a.ansprechpartner_id == k.id %}selected{% endif %}>{{ k.anzeigename }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="anl-lieferant">Lieferant</label>
+        <select class="form-select" id="anl-lieferant" name="lieferant_id">
+          <option value="">–</option>
+          {% for l in lieferanten %}
+          <option value="{{ l.id }}" {% if a and a.lieferant_id == l.id %}selected{% endif %}>{{ l.firma }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="anl-art">Art</label>
+        <select class="form-select" id="anl-art" name="art">
+          {% for wert in arten %}
+          <option value="{{ wert }}" {% if a and a.art == wert %}selected{% endif %}>{{ wert or '–' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="anl-gruppe">Anlagengruppe</label>
+        <input class="form-control" id="anl-gruppe" name="anlagengruppe" value="{{ a.anlagengruppe if a else '' }}"
+               placeholder="z. B. Gasgeräte">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="anl-untergruppe">Untergruppe</label>
+        <input class="form-control" id="anl-untergruppe" name="untergruppe" value="{{ a.untergruppe if a else '' }}">
+      </div>
+    </div>
+  </div>
+</div>

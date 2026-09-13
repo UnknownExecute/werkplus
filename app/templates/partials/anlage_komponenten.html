@@ -1,0 +1,55 @@
+{# Komponenten einer Anlage (HTMX-Partial in #komponenten-bereich). Erwartet: anlage, komponenten #}
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead><tr><th>Komponente</th><th>Hersteller / Typ</th><th>Seriennummer</th><th>Einbau</th><th>Notiz</th><th></th></tr></thead>
+  <tbody>
+    {% for k in komponenten %}
+    <tr>
+      <td><strong>{{ k.bezeichnung }}</strong></td>
+      <td>{{ k.hersteller }}{% if k.hersteller and k.typ %} / {% endif %}{{ k.typ }}</td>
+      <td>{{ k.seriennummer_text }}</td>
+      <td class="text-nowrap">{{ k.einbaudatum | datum }}</td>
+      <td class="small text-muted">{{ k.notiz }}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/anlagen/{{ anlage.id }}/komponenten/{{ k.id }}/loeschen"
+                hx-confirm="Komponente „{{ k.bezeichnung }}“ entfernen?"
+                hx-target="#komponenten-bereich" hx-swap="innerHTML">Entfernen</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-muted">Noch keine Komponenten erfasst (z. B. Brenner, Pumpe, Speicher, Regelung).</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form class="card" hx-post="/anlagen/{{ anlage.id }}/komponenten"
+      hx-target="#komponenten-bereich" hx-swap="innerHTML" data-reset-nach-request>
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-12"><h3 class="h6 mb-0">Komponente hinzufügen</h3></div>
+    <div class="col-md-3">
+      <label class="form-label">Bezeichnung *</label>
+      <input class="form-control form-control-sm" name="bezeichnung" required placeholder="z. B. Brenner">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Hersteller</label>
+      <input class="form-control form-control-sm" name="hersteller">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Typ</label>
+      <input class="form-control form-control-sm" name="typ">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Seriennummer</label>
+      <input class="form-control form-control-sm" name="seriennummer_text">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Einbau</label>
+      <input class="form-control form-control-sm" type="date" name="einbaudatum">
+    </div>
+    <div class="col-md-1">
+      <button class="btn btn-sm btn-primary w-100" type="submit">+</button>
+    </div>
+    <div class="col-12">
+      <input class="form-control form-control-sm" name="notiz" placeholder="Notiz">
+    </div>
+  </div>
+</form>

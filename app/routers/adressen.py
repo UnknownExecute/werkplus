@@ -19,13 +19,11 @@ from app.models import (
     Aktivitaet,
     Anlage,
     Ansprechpartner,
-    Artikel,
     Beleg,
     Belegart,
     BelegStatus,
     Benutzer,
     Lieferadresse,
-    Seriennummer,
 )
 from app.pagination import Blaetterwerk, blaettere
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS
@@ -363,28 +361,13 @@ def _detail_kontext(session: Session, adresse: Adresse) -> dict:
     )
     anlagen = list(
         session.exec(
-            select(Anlage, Artikel)
-            .join(Artikel, col(Anlage.artikel_id) == col(Artikel.id))
-            .where(Anlage.adresse_id == adresse.id)
+            select(Anlage).where(Anlage.adresse_id == adresse.id).order_by(col(Anlage.id).desc())
         ).all()
     )
-    # Seriennummer je Anlage — sie identifiziert das Gerät beim Kunden und ist
-    # das, wonach am Telefon gefragt wird ("welche Therme steht da?").
-    anlagen_sn: dict[int, str] = {}
-    if anlagen:
-        anlagen_sn = {
-            anlage_id: sn
-            for anlage_id, sn in session.exec(
-                select(Anlage.id, Seriennummer.sn)  # type: ignore[arg-type]
-                .join(Seriennummer, col(Anlage.seriennummer_id) == col(Seriennummer.id))
-                .where(Anlage.adresse_id == adresse.id)
-            ).all()
-        }
     return {
         **_form_kontext(adresse),
         "belege": belege,
         "anlagen": anlagen,
-        "anlagen_sn": anlagen_sn,
         "ansprechpartner": adresse_service.ansprechpartner_liste(session, adresse.id),
         "lieferadressen": adresse_service.lieferadressen(session, adresse.id),
         "belegart_labels": BELEGART_LABELS,

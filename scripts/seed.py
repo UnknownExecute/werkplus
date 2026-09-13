@@ -36,6 +36,7 @@ from app.models import (
 )
 from app.services import (
     adresse_service,
+    anlagen_service,
     artikel_service,
     beleg_service,
     berechnung,
@@ -280,14 +281,44 @@ def _seed_demo_anlagen(session: Session) -> None:
         session.flush()
         session.add(
             Anlage(
+                anlagenr=anlagen_service.naechste_anlagenr(session),
                 adresse_id=kunde.id,
                 artikel_id=artikel.id,
                 seriennummer_id=sn.id,
+                bezeichnung=artikel.bezeichnung,
+                hersteller="Vaillant" if artikelnr.startswith("HZ") else "Daikin",
+                typ=artikel.bezeichnung.split()[-1],
+                seriennummer_text=sn_text,
+                art="Heizung" if artikelnr.startswith("HZ") else "Klima",
+                anlagengruppe="Wärmeerzeuger" if artikelnr.startswith("HZ") else "Klimageräte",
                 standort=standort,
                 inbetriebnahme=date.today() - timedelta(days=365),
                 naechste_wartung=date.today() + timedelta(days=tage),
+                wartungsintervall_monate=12,
                 aktiv=True,
             )
+        )
+    session.flush()
+    # Freie Fremdanlage (kein Lagerartikel) mit Komponenten und Wartungsvertrag
+    post = _hole_kunde(session, "Gasthof Post KG")
+    fremd = anlagen_service.lege_freie_anlage_an(
+        session, adresse_id=post.id,
+        bezeichnung="Ölkessel Viessmann Vitola 200, Heizzentrale Nebengebäude",
+        hersteller="Viessmann", typ="Vitola 200", seriennummer_text="7183 5546 2001",
+        art="Heizung", anlagengruppe="Wärmeerzeuger", untergruppe="Öl", standort="Nebengebäude",
+        kostenstelle="HZ-02", technische_info="27 kW, Baujahr 2009, Öltank 3.000 l",
+        inbetriebnahme=date(2009, 10, 15), naechste_wartung=date.today() + timedelta(days=45),
+        wartungsintervall_monate=12, vertrag_nr="WV-2024-017", vertrag_von=date(2024, 1, 1),
+        vertrag_bis=date(2026, 12, 31), vertrag_pauschale=Decimal("290.00"),
+        vertrag_notiz="Jahreswartung inkl. Abgasmessung, Anfahrt inklusive",
+    )
+    for bez, herst, typ, sn_k in (
+        ("Ölbrenner", "Weishaupt", "WL10", "WL10-88712"),
+        ("Umwälzpumpe", "Grundfos", "Alpha2 25-60", ""),
+        ("Regelung", "Viessmann", "Vitotronic 200", "VT200-4471"),
+    ):
+        anlagen_service.fuege_komponente_hinzu(
+            session, fremd, bezeichnung=bez, hersteller=herst, typ=typ, seriennummer_text=sn_k
         )
     session.flush()
 

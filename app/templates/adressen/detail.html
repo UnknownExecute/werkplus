@@ -178,19 +178,21 @@
     {% endif %}
     <table class="table table-hover tabelle-kompakt">
       <thead>
-        <tr><th>Artikel</th><th>Seriennummer</th><th>Standort</th><th>Nächste Wartung</th></tr>
+        <tr><th>Nummer</th><th>Anlage</th><th>Hersteller / Typ</th><th>Seriennummer</th><th>Standort</th><th>Nächste Wartung</th></tr>
       </thead>
       <tbody>
-        {% for anlage, anlage_artikel in anlagen %}
+        {% for anlage in anlagen %}
         <tr>
-          <td><a href="/anlagen/{{ anlage.id }}">{{ anlage_artikel.bezeichnung }}</a></td>
-          <td>{{ anlagen_sn.get(anlage.id, "") }}</td>
+          <td><a href="/anlagen/{{ anlage.id }}">{{ anlage.anlagenr }}</a></td>
+          <td><a href="/anlagen/{{ anlage.id }}">{{ anlage.kurz }}</a></td>
+          <td>{{ anlage.hersteller }} {{ anlage.typ }}</td>
+          <td>{{ anlage.seriennummer_text }}</td>
           <td>{{ anlage.standort }}</td>
           <td>{{ anlage.naechste_wartung | datum }}</td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="4" class="text-muted">
+          <td colspan="6" class="text-muted">
             Noch keine Anlagen erfasst.
             {% if darf_bereich(request, 'anlagen', 'bearbeiten') %}
             Mit „Anlage anlegen“ auch Altgeräte ohne Lieferschein eintragen.

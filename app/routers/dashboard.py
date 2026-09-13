@@ -16,7 +16,6 @@ from app.dependencies import get_current_user
 from app.models import (
     Adresse,
     Anlage,
-    Artikel,
     Beleg,
     Belegart,
     BelegStatus,
@@ -76,14 +75,13 @@ def _offene_posten(
     return posten, offen_gesamt, len(zeilen)
 
 
-def _faellige_wartungen(session: Session) -> list[tuple[Anlage, Adresse, Artikel]]:
+def _faellige_wartungen(session: Session) -> list[tuple[Anlage, Adresse]]:
     """Aktive Anlagen, deren nächste Wartung überfällig oder binnen 30 Tagen fällig ist."""
     stichtag = date.today() + timedelta(days=WARTUNG_VORLAUF_TAGE)
     return list(
         session.exec(
-            select(Anlage, Adresse, Artikel)
+            select(Anlage, Adresse)
             .join(Adresse, col(Anlage.adresse_id) == col(Adresse.id))
-            .join(Artikel, col(Anlage.artikel_id) == col(Artikel.id))
             .where(
                 col(Anlage.aktiv),
                 col(Anlage.naechste_wartung).is_not(None),
