@@ -1,0 +1,41 @@
+{# Mailversand eines Belegs (PDF-Anhang). Erwartet: beleg, label, konfiguriert, absender, an, betreff, text #}
+<div class="card mt-2 mb-3 mail-dialog">
+  <div class="card-body py-3">
+    <h6 class="card-title">{{ label }} {{ beleg.belegnr }} per Mail versenden</h6>
+    {% if not konfiguriert %}
+    <div class="alert alert-warning mb-2">
+      Mailversand ist nicht konfiguriert. In der <code>.env</code> die Werte
+      <code>WERKPLUS_SMTP_HOST</code>, <code>WERKPLUS_SMTP_BENUTZER</code>, <code>WERKPLUS_SMTP_PASSWORT</code>
+      (und optional <code>WERKPLUS_SMTP_ABSENDER</code>) setzen und den Container neu starten.
+    </div>
+    {% endif %}
+    <form method="post" action="/belege/detail/{{ beleg.id }}/mail" class="row g-2">
+      <div class="col-md-6">
+        <label class="form-label" for="mail-an">An</label>
+        <input class="form-control form-control-sm" type="text" id="mail-an" name="an" value="{{ an }}"
+               placeholder="empfaenger@firma.at, zweiter@firma.at" required autofocus>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="mail-cc">Kopie (CC)</label>
+        <input class="form-control form-control-sm" type="text" id="mail-cc" name="cc" value="">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="mail-betreff">Betreff</label>
+        <input class="form-control form-control-sm" type="text" id="mail-betreff" name="betreff" value="{{ betreff }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="mail-text">Text</label>
+        <textarea class="form-control form-control-sm" id="mail-text" name="text" rows="7">{{ text }}</textarea>
+      </div>
+      <div class="col-12 form-text">
+        Anhang: <strong>{{ label }}_{{ beleg.belegnr }}.pdf</strong>{% if absender %} · Absender: {{ absender }}{% endif %}
+        {% if beleg.status == 'entwurf' %}· Der Entwurf wird beim Versand gebucht (Status „gedruckt/versendet“) und ist danach unveränderlich.{% endif %}
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit" {% if not konfiguriert %}disabled{% endif %}>Senden</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="this.closest('.mail-dialog').remove()">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>

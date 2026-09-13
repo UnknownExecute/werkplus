@@ -130,7 +130,9 @@ def test_uebersicht_ek_und_unbekannter_bereich(engine, client):
     r = client.get("/belege/uebersicht/ek")
     assert r.status_code == 200
     assert "Belegübersicht EK" in r.text
+    assert "Preisanfrage" in r.text  # erster EK-Reiter (Kplus-Reihenfolge)
     assert "Eingangslieferschein" in r.text and "Eingangsrechnung" in r.text
+    r = client.get("/belege/uebersicht/ek", params={"art": "bestellung"})
     assert f"/belege/detail/{bestellung_id}" in r.text
     assert "Auftrag erhalten" not in r.text  # nur im Angebots-Reiter
 

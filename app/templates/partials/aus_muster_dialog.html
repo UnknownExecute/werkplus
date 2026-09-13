@@ -1,0 +1,22 @@
+{# Kplus „Beleg aus Muster": echter Beleg aus der Vorlage, wahlweise für eine andere Adresse. Erwartet: beleg, adressen #}
+<div class="card mt-2 mb-3 muster-dialog">
+  <div class="card-body py-3">
+    <h6 class="card-title">Beleg aus Muster {{ beleg.belegnr }} erzeugen</h6>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/aus-muster" class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label class="form-label" for="muster-adresse">Adresse des neuen Belegs</label>
+        <select class="form-select form-select-sm" id="muster-adresse" name="adresse_id" autofocus>
+          {% for a in adressen %}
+          <option value="{{ a.id }}" {% if a.id == beleg.adresse_id %}selected{% endif %}>{{ a.adressnr }} {{ a.firma }}{% if a.ort %} – {{ a.ort }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">Beleg erzeugen</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="this.closest('.muster-dialog').remove()">Abbrechen</button>
+      </div>
+      <div class="col-12 form-text">Alle Positionen und Texte des Musters werden übernommen; der neue Beleg bekommt die nächste Belegnummer.</div>
+    </form>
+  </div>
+</div>

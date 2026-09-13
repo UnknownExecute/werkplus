@@ -6,7 +6,8 @@
     <a class="small text-decoration-none" href="{{ uebersicht_url }}">&larr; Belegübersicht</a>
     <h1 class="h3 mb-0">
       {{ label }} {{ beleg.belegnr }}
-      <span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span>
+      {% if beleg.ist_muster %}<span class="badge bg-secondary">Muster (Vorlage)</span>
+      {% else %}<span class="badge {{ status_badges[beleg.status] }}">{{ status_labels[beleg.status] }}</span>{% endif %}
       {% if angebotsergebnis_label %}
       <span class="badge {% if beleg.angebotsergebnis == 'erhalten' %}bg-success{% else %}bg-danger{% endif %}">{{ angebotsergebnis_label }}</span>
       {% endif %}
@@ -21,7 +22,12 @@
     {% if beleg.betreff %}<div class="text-muted">{{ beleg.betreff }}</div>{% endif %}
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    {% if beleg.status == 'entwurf' %}
+    {% if beleg.ist_muster %}
+    <button class="btn btn-primary" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/aus-muster-dialog"
+            hx-target="#muster-dialog" hx-swap="innerHTML">Beleg aus Muster erzeugen</button>
+    {% endif %}
+    {% if beleg.status == 'entwurf' and not beleg.ist_muster %}
     {# Buchen friert die Summen ein und macht den Beleg unveränderlich —
        bei Liefer-/Wareneingangsscheinen werden zusätzlich Lagerbestände gebucht. #}
     <form method="post" action="/belege/detail/{{ beleg.id }}/status/gedruckt"
@@ -43,7 +49,20 @@
       <button class="btn btn-success" type="submit">Erledigt</button>
     </form>
     {% endif %}
-    {% if ist_admin and beleg.status in ('entwurf', 'gedruckt') %}
+    {% if mail_moeglich %}
+    <button class="btn btn-outline-primary" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/mail-dialog"
+            hx-target="#mail-dialog" hx-swap="innerHTML">Mail versenden</button>
+    {% elif not mail_konfiguriert and not beleg.ist_muster %}
+    <button class="btn btn-outline-secondary" type="button" disabled
+            title="Mailversand nicht konfiguriert – WERKPLUS_SMTP_HOST in der .env setzen">Mail versenden</button>
+    {% endif %}
+    {% if bearbeitbar %}
+    <button class="btn btn-outline-secondary" type="button"
+            hx-get="/belege/detail/{{ beleg.id }}/adresse-dialog"
+            hx-target="#adresse-dialog" hx-swap="innerHTML">Belegadresse tauschen</button>
+    {% endif %}
+    {% if ist_admin and beleg.status in ('entwurf', 'gedruckt') and not beleg.ist_muster %}
     <form method="post" action="/belege/detail/{{ beleg.id }}/status/storniert"
           data-bestaetigen="{{ label }} {{ beleg.belegnr }} wirklich stornieren? Das lässt sich nicht rückgängig machen; gebuchte Lagerbewegungen werden zurückgebucht.">
       <button class="btn btn-outline-danger" type="submit">Stornieren</button>
@@ -62,9 +81,14 @@
       <button class="btn btn-outline-primary" type="submit">Schlussrechnung</button>
     </form>
     {% endif %}
+    {% if not beleg.ist_muster %}
     <form method="post" action="/belege/detail/{{ beleg.id }}/duplizieren">
       <button class="btn btn-outline-secondary" type="submit">Kopieren</button>
     </form>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/als-muster">
+      <button class="btn btn-outline-secondary" type="submit">Als Muster speichern</button>
+    </form>
+    {% endif %}
     {% if loeschbar %}
     <form method="post" action="/belege/detail/{{ beleg.id }}/loeschen"
           data-bestaetigen="{{ label }} {{ beleg.belegnr }} wirklich löschen? Das lässt sich nicht rückgängig machen.">
@@ -91,6 +115,12 @@
 {% if fehler %}
 <div class="alert alert-danger">{{ fehler }}</div>
 {% endif %}
+{% if gesendet %}
+<div class="alert alert-success">Beleg per Mail versendet an {{ gesendet }}.</div>
+{% endif %}
+{% if beleg.ist_muster %}
+<div class="alert alert-secondary">Dies ist ein Muster (Vorlage): es wird nie gebucht. Mit „Beleg aus Muster erzeugen“ entsteht ein echter Beleg mit Belegnummer.</div>
+{% endif %}
 {% if anlage_hinweis %}
 <div class="alert alert-info">
   Anlage beim Kunden anlegen?
@@ -104,6 +134,12 @@
 {# Dialoge (Folgebeleg, Abschlag, Auftrag erhalten) liegen über den Reitern.
    ?dialog=folgebeleg|abschlag öffnet den Dialog direkt (aus der Übersicht). #}
 <div id="angebot-dialog"></div>
+<div id="mail-dialog"
+     {% if dialog_auto == 'mail' and mail_moeglich %}hx-get="/belege/detail/{{ beleg.id }}/mail-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+<div id="adresse-dialog"
+     {% if dialog_auto == 'adresse' and bearbeitbar %}hx-get="/belege/detail/{{ beleg.id }}/adresse-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+<div id="muster-dialog"
+     {% if dialog_auto == 'aus_muster' and beleg.ist_muster %}hx-get="/belege/detail/{{ beleg.id }}/aus-muster-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div id="folgebeleg-dialog"
      {% if dialog_auto == 'folgebeleg' and folgebeleg_moeglich %}hx-get="/belege/detail/{{ beleg.id }}/folgebeleg-dialog" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div id="abschlag-dialog"

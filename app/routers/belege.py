@@ -47,6 +47,7 @@ from app.services import (
     beleg_service,
     berechnung,
     lager_service,
+    mail_service,
     seriennummer_service,
     zeiterfassung_service,
 )
@@ -65,6 +66,7 @@ from app.services.fehler import (
     UngueltigerStatusUebergang,
     WerkplusFehler,
 )
+from app.services.pdf_service import PdfNichtVerfuegbar
 from app.templating import templates
 
 router = APIRouter(
@@ -80,6 +82,7 @@ BELEGART_LABELS: dict[Belegart, str] = {
     Belegart.LIEFERSCHEIN: "Lieferschein",
     Belegart.RECHNUNG: "Rechnung",
     Belegart.GUTSCHRIFT: "Gutschrift",
+    Belegart.PREISANFRAGE: "Preisanfrage",
     Belegart.BESTELLUNG: "Bestellung",
     Belegart.EK_LIEFERSCHEIN: "EK-Lieferschein/Wareneingang",
     Belegart.EK_RECHNUNG: "EK-Rechnung",
@@ -91,6 +94,7 @@ BELEGART_LABELS_PLURAL: dict[Belegart, str] = {
     Belegart.LIEFERSCHEIN: "Lieferscheine",
     Belegart.RECHNUNG: "Rechnungen",
     Belegart.GUTSCHRIFT: "Gutschriften",
+    Belegart.PREISANFRAGE: "Preisanfragen",
     Belegart.BESTELLUNG: "Bestellungen",
     Belegart.EK_LIEFERSCHEIN: "Wareneingänge",
     Belegart.EK_RECHNUNG: "EK-Rechnungen",
@@ -132,7 +136,12 @@ UEBERSICHT_TABS: dict[str, list[Belegart]] = {
         Belegart.RECHNUNG,
         Belegart.GUTSCHRIFT,
     ],
-    "ek": [Belegart.BESTELLUNG, Belegart.EK_LIEFERSCHEIN, Belegart.EK_RECHNUNG],
+    "ek": [
+        Belegart.PREISANFRAGE,
+        Belegart.BESTELLUNG,
+        Belegart.EK_LIEFERSCHEIN,
+        Belegart.EK_RECHNUNG,
+    ],
 }
 UEBERSICHT_TITEL = {"vk": "Belegübersicht VK", "ek": "Belegübersicht EK"}
 UEBERSICHT_BEREICH = {"vk": "verkauf", "ek": "einkauf"}
@@ -142,6 +151,7 @@ TAB_LABELS: dict[Belegart, str] = {
     Belegart.LIEFERSCHEIN: "Lieferschein",
     Belegart.RECHNUNG: "Rechnung",
     Belegart.GUTSCHRIFT: "Gutschrift",
+    Belegart.PREISANFRAGE: "Preisanfrage",
     Belegart.BESTELLUNG: "Bestellung",
     Belegart.EK_LIEFERSCHEIN: "Eingangslieferschein",
     Belegart.EK_RECHNUNG: "Eingangsrechnung",
@@ -153,6 +163,7 @@ UEBERSICHT_STATUS: dict[str, str] = {
     "erledigt": "Erledigte",
     "nicht_gedruckt": "Nicht gedruckte",
     "storniert": "Stornierte",
+    "muster": "Muster",
 }
 ANGEBOTSERGEBNIS_LABELS: dict[str, str] = {
     "": "",
@@ -325,6 +336,7 @@ def _suche_belege(
         select(Beleg, Adresse)
         .join(Adresse, Beleg.adresse_id == Adresse.id)  # type: ignore[arg-type]
         .where(Beleg.belegart == art)
+        .where(Beleg.ist_muster == False)  # noqa: E712
     )
     if status_filter in set(BelegStatus):
         stmt = stmt.where(Beleg.status == BelegStatus(status_filter))
@@ -598,6 +610,8 @@ def _uebersicht_kontext(  # noqa: PLR0913
     von_datum, bis_datum = _uebersicht_datum(von), _uebersicht_datum(bis)
 
     bedingungen = [Beleg.belegart == art]
+    # Kplus: Muster (Vorlagen) nur im eigenen Filter, sonst nie
+    bedingungen.append(Beleg.ist_muster == (status_filter == "muster"))  # noqa: E712
     if status_filter == "unerledigt":
         bedingungen.append(
             Beleg.status.in_([BelegStatus.ENTWURF, BelegStatus.GEDRUCKT])  # type: ignore[attr-defined]
@@ -717,6 +731,8 @@ def _uebersicht_kontext(  # noqa: PLR0913
             request, session, UEBERSICHT_BEREICH[bereich], Zugriff.BEARBEITEN
         ),
         "nav_aktiv": f"/belege/uebersicht/{bereich}",
+        "muster_filter": status_filter == "muster",
+        "mail_konfiguriert": mail_service.ist_konfiguriert(),
     }
 
 
@@ -884,6 +900,161 @@ def beleg_loeschen(
     return RedirectResponse(ziel, status_code=status.HTTP_302_FOUND)
 
 
+# -------------------------------------------- Kplus: Mail, Adresse tauschen, Muster
+
+
+@router.get("/detail/{beleg_id}/mail-dialog")
+def mail_dialog(
+    request: Request,
+    beleg_id: int,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """HTMX-Partial: Empfänger/Betreff/Text vorbelegt, PDF hängt automatisch an."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    if beleg.ist_muster:
+        return _meldung(request, "Muster werden nicht versendet", status.HTTP_409_CONFLICT)
+    label = BELEGART_LABELS[beleg.belegart]
+    return templates.TemplateResponse(
+        request,
+        "partials/mail_dialog.html",
+        {
+            "beleg": beleg,
+            "label": label,
+            "konfiguriert": mail_service.ist_konfiguriert(),
+            "absender": mail_service.absender(session) if mail_service.ist_konfiguriert() else "",
+            **mail_service.vorschlag(session, beleg, label),
+        },
+    )
+
+
+@router.post("/detail/{beleg_id}/mail")
+def mail_senden(  # noqa: PLR0913
+    request: Request,
+    beleg_id: int,
+    an: str = Form(""),
+    cc: str = Form(""),
+    betreff: str = Form(""),
+    text: str = Form(""),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Beleg als PDF per Mail verschicken; Entwürfe werden dabei gebucht."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    try:
+        empfaenger = mail_service.sende_beleg(
+            session, beleg, an=an, cc=cc, betreff=betreff, text=text,
+            belegart_label=BELEGART_LABELS[beleg.belegart], benutzer_id=benutzer.id,
+        )
+    except (
+        mail_service.MailNichtKonfiguriert,
+        mail_service.MailFehler,
+        PdfNichtVerfuegbar,
+        WerkplusFehler,
+    ) as exc:
+        session.rollback()
+        return _editor_redirect(beleg_id, fehler=str(exc))
+    session.commit()
+    return RedirectResponse(
+        f"/belege/detail/{beleg_id}?gesendet={quote(', '.join(empfaenger))}",
+        status_code=status.HTTP_302_FOUND,
+    )
+
+
+@router.get("/detail/{beleg_id}/adresse-dialog")
+def adresse_dialog(
+    request: Request,
+    beleg_id: int,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """HTMX-Partial: Belegadresse tauschen (nur Entwurf)."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    if beleg.status != BelegStatus.ENTWURF:
+        return _meldung(request, "Nur im Entwurf möglich", status.HTTP_409_CONFLICT)
+    return templates.TemplateResponse(
+        request,
+        "partials/adresse_dialog.html",
+        {"beleg": beleg, "adressen": _adressen_fuer_belegart(session, beleg.belegart)},
+    )
+
+
+@router.post("/detail/{beleg_id}/adresse")
+def adresse_tauschen(
+    request: Request,
+    beleg_id: int,
+    adresse_id: int = Form(...),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Belegadresse tauschen"."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    adresse = session.get(Adresse, adresse_id)
+    if adresse is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Adresse nicht gefunden")
+    try:
+        beleg_service.wechsle_adresse(session, beleg, adresse)
+    except (BelegGesperrt, WerkplusFehler) as exc:
+        session.rollback()
+        return _editor_redirect(beleg_id, fehler=str(exc))
+    session.commit()
+    return _editor_redirect(beleg_id)
+
+
+@router.post("/detail/{beleg_id}/als-muster")
+def als_muster_speichern(
+    request: Request,
+    beleg_id: int,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Als Muster speichern": Kopie des Belegs als Vorlage."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    muster = beleg_service.speichere_als_muster(session, beleg, benutzer_id=benutzer.id)
+    session.commit()
+    return _editor_redirect(muster.id)
+
+
+@router.get("/detail/{beleg_id}/aus-muster-dialog")
+def aus_muster_dialog(
+    request: Request,
+    beleg_id: int,
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """HTMX-Partial: Adresse für den neuen Beleg aus dem Muster wählen."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    if not beleg.ist_muster:
+        return _meldung(request, "Kein Muster", status.HTTP_409_CONFLICT)
+    return templates.TemplateResponse(
+        request,
+        "partials/aus_muster_dialog.html",
+        {"beleg": beleg, "adressen": _adressen_fuer_belegart(session, beleg.belegart)},
+    )
+
+
+@router.post("/detail/{beleg_id}/aus-muster")
+def aus_muster_erzeugen(
+    request: Request,
+    beleg_id: int,
+    adresse_id: str = Form(""),
+    benutzer: Benutzer = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Kplus „Beleg aus Muster": echter Beleg (mit Belegnummer) aus der Vorlage."""
+    beleg = _lade_beleg(session, beleg_id, request)
+    adresse = session.get(Adresse, int(adresse_id)) if adresse_id.strip().isdigit() else None
+    try:
+        neu = beleg_service.erzeuge_aus_muster(
+            session, beleg, adresse=adresse, benutzer_id=benutzer.id
+        )
+    except WerkplusFehler as exc:
+        session.rollback()
+        return _editor_redirect(beleg_id, fehler=str(exc))
+    session.commit()
+    return _editor_redirect(neu.id)
+
+
 # ---------------------------------------------------------------- Liste + Anlage
 
 
@@ -895,6 +1066,7 @@ def beleg_editor(  # noqa: PLR0913
     gebucht: str = "",
     tab: str = "",
     dialog: str = "",
+    gesendet: str = "",
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -940,6 +1112,9 @@ def beleg_editor(  # noqa: PLR0913
             "uebersicht_url": uebersicht_url(beleg.belegart),
             "nav_aktiv": f"/belege/uebersicht/{'vk' if beleg.belegart in VERKAUFSARTEN else 'ek'}",
             "loeschbar": beleg.status == BelegStatus.ENTWURF,
+            "gesendet": gesendet,
+            "mail_konfiguriert": mail_service.ist_konfiguriert(),
+            "mail_moeglich": mail_service.ist_konfiguriert() and not beleg.ist_muster,
             # Abweichende Lieferadressen des Kunden (Kplus „Lieferadressen")
             "lieferadressen": list(
                 session.exec(
@@ -1858,6 +2033,7 @@ def beleg_neu_form(
     request: Request,
     belegart: str,
     adresse_id: int | None = None,
+    muster: str = "",
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -1870,6 +2046,7 @@ def beleg_neu_form(
             "label": BELEGART_LABELS[art],
             "adressen": _adressen_fuer_belegart(session, art),
             "vorgewaehlte_adresse_id": adresse_id,
+            "als_muster": bool(muster),
             "heute": date.today(),
             "auftragsart_labels": AUFTRAGSART_LABELS,
             "auftragsarten": list(Auftragsart),
@@ -1889,6 +2066,7 @@ def beleg_neu(
     termin: str = Form(""),
     auftragsart: str = Form(""),
     kopftext: str = Form(""),
+    als_muster: str = Form(""),
     benutzer: Benutzer = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -1905,6 +2083,13 @@ def beleg_neu(
     beleg_datum = _parse_datum(datum)
     if beleg_datum is not None:
         kopf["datum"] = beleg_datum
-    beleg = beleg_service.erstelle_beleg(session, art, adresse, benutzer_id=benutzer.id, **kopf)
+    if als_muster:
+        beleg = beleg_service.erstelle_muster(
+            session, art, adresse, benutzer_id=benutzer.id, **kopf
+        )
+    else:
+        beleg = beleg_service.erstelle_beleg(
+            session, art, adresse, benutzer_id=benutzer.id, **kopf
+        )
     session.commit()
     return _editor_redirect(beleg.id)

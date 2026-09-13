@@ -27,7 +27,7 @@ from app.services.fehler import (
     UngueltigerStatusUebergang,
     WerkplusFehler,
 )
-from app.services.nummernkreis_service import naechste_belegnr
+from app.services.nummernkreis_service import naechste_belegnr, naechste_nummer
 
 ERLAUBTE_UEBERGAENGE: dict[BelegStatus, set[BelegStatus]] = {
     BelegStatus.ENTWURF: {BelegStatus.GEDRUCKT, BelegStatus.STORNIERT},
@@ -42,9 +42,20 @@ FOLGEBELEGART: dict[Belegart, Belegart] = {
     Belegart.AUFTRAG: Belegart.LIEFERSCHEIN,
     Belegart.LIEFERSCHEIN: Belegart.RECHNUNG,
     Belegart.RECHNUNG: Belegart.GUTSCHRIFT,
+    Belegart.PREISANFRAGE: Belegart.BESTELLUNG,
     Belegart.BESTELLUNG: Belegart.EK_LIEFERSCHEIN,
     Belegart.EK_LIEFERSCHEIN: Belegart.EK_RECHNUNG,
 }
+
+VERKAUFSARTEN: frozenset[Belegart] = frozenset(
+    {
+        Belegart.ANGEBOT,
+        Belegart.AUFTRAG,
+        Belegart.LIEFERSCHEIN,
+        Belegart.RECHNUNG,
+        Belegart.GUTSCHRIFT,
+    }
+)
 
 # Hook-Punkte für Lagerwirkung (M4): fn(session, beleg, benutzer_id)
 BuchungsHook = Callable[[Session, Beleg, int | None], None]
@@ -120,6 +131,11 @@ def setze_status(
     benutzer_id: int | None = None,
 ) -> None:
     """Validiert und vollzieht einen Statusübergang (inkl. Buchungs-/Storno-Hooks)."""
+    if beleg.ist_muster:
+        raise UngueltigerStatusUebergang(
+            f"Muster {beleg.belegnr} kann nicht gebucht werden — "
+            "zuerst einen Beleg aus dem Muster erzeugen"
+        )
     if neuer_status not in ERLAUBTE_UEBERGAENGE.get(beleg.status, set()):
         raise UngueltigerStatusUebergang(
             f"Beleg {beleg.belegnr}: Übergang {beleg.status} -> {neuer_status} nicht erlaubt"
@@ -385,27 +401,32 @@ def erzeuge_folgebeleg(
     return neu
 
 
-def dupliziere_beleg(
-    session: Session, vorlage: Beleg, benutzer_id: int | None = None
+def _kopiere_beleg(  # noqa: PLR0913
+    session: Session,
+    vorlage: Beleg,
+    belegnr: str,
+    adresse_id: int,
+    ist_muster: bool,
+    benutzer_id: int | None,
 ) -> Beleg:
-    """Legt einen neuen Entwurf derselben Belegart als Kopie/Vorlage an.
+    """Frischer Entwurf als Kopie von ``vorlage`` (Kopf + alle Positionen).
 
-    Kopiert Kopftexte und ALLE Positionen (inkl. Kalkulations-, Preis- und
-    Textfelder). Das Duplikat ist eine frische Vorlage: neue Belegnummer,
-    Status Entwurf, datum=heute, KEIN ``vorgaenger_beleg_id``, keine
-    Druck-/Zahl-Zeitstempel, keine ``ursprungs_position_id`` und keine
-    SN-Zuordnungen.
+    Die Kopie ist eine neue Vorlage: Status Entwurf, datum=heute, KEIN
+    ``vorgaenger_beleg_id``, keine Druck-/Zahl-Zeitstempel, keine
+    ``ursprungs_position_id`` und keine SN-Zuordnungen. Lieferadresse nur, wenn
+    die Adresse gleich bleibt.
     """
     neu = Beleg(
         belegart=vorlage.belegart,
-        belegnr=naechste_belegnr(session, vorlage.belegart),
+        belegnr=belegnr,
         status=BelegStatus.ENTWURF,
-        adresse_id=vorlage.adresse_id,
+        ist_muster=ist_muster,
+        adresse_id=adresse_id,
         datum=date.today(),
         zahlungsziel_tage=vorlage.zahlungsziel_tage,
         betreff=vorlage.betreff,
         auftragsart=vorlage.auftragsart,
-        lieferadresse_id=vorlage.lieferadresse_id,
+        lieferadresse_id=vorlage.lieferadresse_id if adresse_id == vorlage.adresse_id else None,
         kopftext=vorlage.kopftext,
         fusstext=vorlage.fusstext,
         erstellt_von=benutzer_id,
@@ -436,6 +457,113 @@ def dupliziere_beleg(
     session.flush()
     aktualisiere_summen(session, neu)
     return neu
+
+
+def dupliziere_beleg(
+    session: Session, vorlage: Beleg, benutzer_id: int | None = None
+) -> Beleg:
+    """Legt einen neuen Entwurf derselben Belegart als Kopie/Vorlage an.
+
+    Kopiert Kopftexte und ALLE Positionen (inkl. Kalkulations-, Preis- und
+    Textfelder); neue Belegnummer, Status Entwurf — auch aus einem Muster
+    (dann ist das Ergebnis ein normaler Beleg).
+    """
+    return _kopiere_beleg(
+        session, vorlage, naechste_belegnr(session, vorlage.belegart),
+        vorlage.adresse_id, ist_muster=False, benutzer_id=benutzer_id,
+    )
+
+
+# --------------------------------------------------------------- Kplus: Muster
+
+
+def naechste_musternr(session: Session, belegart: Belegart) -> str:
+    """Muster haben einen eigenen Zähler je Belegart (``M0001``), ohne Jahr."""
+    return f"M{naechste_nummer(session, f'muster:{belegart}', 0):04d}"
+
+
+def erstelle_muster(
+    session: Session,
+    belegart: Belegart,
+    adresse: Adresse,
+    benutzer_id: int | None = None,
+    **kopf,
+) -> Beleg:
+    """Leeres Muster (Vorlage) einer Belegart anlegen."""
+    kopf.setdefault("zahlungsziel_tage", adresse.zahlungsziel_tage)
+    muster = Beleg(
+        belegart=belegart,
+        belegnr=naechste_musternr(session, belegart),
+        status=BelegStatus.ENTWURF,
+        ist_muster=True,
+        adresse_id=adresse.id,
+        erstellt_von=benutzer_id,
+        **kopf,
+    )
+    session.add(muster)
+    session.flush()
+    return muster
+
+
+def speichere_als_muster(
+    session: Session, vorlage: Beleg, benutzer_id: int | None = None
+) -> Beleg:
+    """Kplus „Als Muster speichern": Kopie des Belegs als Vorlage (Muster-Nummer)."""
+    return _kopiere_beleg(
+        session, vorlage, naechste_musternr(session, vorlage.belegart),
+        vorlage.adresse_id, ist_muster=True, benutzer_id=benutzer_id,
+    )
+
+
+def erzeuge_aus_muster(
+    session: Session,
+    muster: Beleg,
+    adresse: Adresse | None = None,
+    benutzer_id: int | None = None,
+) -> Beleg:
+    """Kplus „Beleg aus Muster": neuer Entwurf mit echter Belegnummer, wahlweise für
+    eine andere Adresse (die Adressart muss zur Belegart passen)."""
+    if not muster.ist_muster:
+        raise WerkplusFehler(f"Beleg {muster.belegnr} ist kein Muster")
+    ziel_adresse_id = muster.adresse_id
+    if adresse is not None:
+        pruefe_adressart(muster.belegart, adresse)
+        ziel_adresse_id = adresse.id
+    neu = _kopiere_beleg(
+        session, muster, naechste_belegnr(session, muster.belegart),
+        ziel_adresse_id, ist_muster=False, benutzer_id=benutzer_id,
+    )
+    if adresse is not None:
+        neu.zahlungsziel_tage = adresse.zahlungsziel_tage
+        session.add(neu)
+        session.flush()
+    return neu
+
+
+# ------------------------------------------------- Kplus: Belegadresse tauschen
+
+
+def pruefe_adressart(belegart: Belegart, adresse: Adresse) -> None:
+    """Verkaufsbelege brauchen einen Kunden, Einkaufsbelege einen Lieferanten."""
+    verkauf = belegart in VERKAUFSARTEN
+    if verkauf and not adresse.ist_kunde:
+        raise WerkplusFehler(f"{adresse.firma} ist kein Kunde")
+    if not verkauf and not adresse.ist_lieferant:
+        raise WerkplusFehler(f"{adresse.firma} ist kein Lieferant")
+
+
+def wechsle_adresse(session: Session, beleg: Beleg, adresse: Adresse) -> None:
+    """Kplus „Belegadresse tauschen": nur im Entwurf; Lieferadresse wird zurückgesetzt,
+    Zahlungsziel kommt von der neuen Adresse."""
+    pruefe_bearbeitbar(beleg)
+    pruefe_adressart(beleg.belegart, adresse)
+    if adresse.id == beleg.adresse_id:
+        return
+    beleg.adresse_id = adresse.id
+    beleg.lieferadresse_id = None
+    beleg.zahlungsziel_tage = adresse.zahlungsziel_tage
+    session.add(beleg)
+    session.flush()
 
 
 # ------------------------------------------------------------ Entwurf löschen
@@ -476,6 +604,7 @@ def angebot_ist_offen(beleg: Beleg) -> bool:
     """Angebot, das noch „erhalten"/„nicht erhalten" werden kann (UI-Anzeige)."""
     return (
         beleg.belegart == Belegart.ANGEBOT
+        and not beleg.ist_muster
         and beleg.status in (BelegStatus.ENTWURF, BelegStatus.GEDRUCKT)
         and not beleg.angebotsergebnis
     )

@@ -16,6 +16,7 @@ class Belegart(StrEnum):
     RECHNUNG = "rechnung"
     GUTSCHRIFT = "gutschrift"
     # Einkauf
+    PREISANFRAGE = "preisanfrage"
     BESTELLUNG = "bestellung"
     EK_LIEFERSCHEIN = "ek_lieferschein"
     EK_RECHNUNG = "ek_rechnung"
@@ -65,6 +66,9 @@ class Beleg(SQLModel, table=True):
     belegart: Belegart = Field(index=True)
     belegnr: str = Field(index=True)
     status: BelegStatus = Field(default=BelegStatus.ENTWURF, index=True)
+    # Kplus „Muster": Vorlage-Beleg (eigener Nummernkreis M0001…), bleibt immer
+    # Entwurf, wird nie gebucht und taucht in den normalen Listen nicht auf.
+    ist_muster: bool = Field(default=False, index=True)
     adresse_id: int = Field(foreign_key="adresse.id", index=True)
     datum: date = Field(default_factory=date.today)
     leistungsdatum_von: date | None = None

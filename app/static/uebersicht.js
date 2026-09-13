@@ -48,6 +48,11 @@
         if (aktion === "auftrag-erhalten" || aktion === "auftrag-nicht-erhalten")
           erlaubt = zeile.dataset.angebotOffen === "1";
         if (aktion === "erledigt") erlaubt = zeile.dataset.erledigbar === "1";
+        if (aktion === "mail") erlaubt = zeile.dataset.muster !== "1" && !!(aktionen.dataset.mail === "1");
+        if (aktion === "adresse-tauschen") erlaubt = zeile.dataset.entwurf === "1";
+        if (aktion === "als-muster") erlaubt = zeile.dataset.muster !== "1";
+        if (aktion === "aus-muster") erlaubt = zeile.dataset.muster === "1";
+        if (aktion === "kopieren") erlaubt = zeile.dataset.muster !== "1";
       }
       const url = zeile
         ? vorlage.replace("{id}", zeile.dataset.id).replace("{adresse_id}", zeile.dataset.adresseId)

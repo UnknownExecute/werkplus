@@ -44,6 +44,12 @@
     <label class="form-label" for="kopftext">Kopftext</label>
     <textarea class="form-control" name="kopftext" id="kopftext" rows="3"></textarea>
   </div>
+  <div class="mb-3 form-check">
+    <input class="form-check-input" type="checkbox" name="als_muster" id="als_muster" value="1"
+           {% if als_muster %}checked{% endif %}>
+    <label class="form-check-label" for="als_muster">Als Muster (Vorlage) anlegen
+      <span class="text-muted small">– Muster bekommen eine M-Nummer, werden nie gebucht und dienen als Kopiervorlage</span></label>
+  </div>
   <button class="btn btn-primary" type="submit" {% if not adressen %}disabled{% endif %}>Anlegen</button>
   <a class="btn btn-outline-secondary" href="{{ uebersicht_url }}">Abbrechen</a>
 </form>

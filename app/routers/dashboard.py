@@ -44,6 +44,7 @@ def _offene_belege(
             select(Beleg, Adresse)
             .join(Adresse, col(Beleg.adresse_id) == col(Adresse.id))
             .where(Beleg.belegart == art, col(Beleg.status).in_(OFFENE_STATUS))
+            .where(col(Beleg.ist_muster).is_(False))
             .order_by(col(Beleg.id).desc())
         ).all()
     )
@@ -99,6 +100,7 @@ def _letzte_belege(session: Session) -> list[tuple[Beleg, Adresse]]:
         session.exec(
             select(Beleg, Adresse)
             .join(Adresse, col(Beleg.adresse_id) == col(Adresse.id))
+            .where(col(Beleg.ist_muster).is_(False))
             .order_by(col(Beleg.id).desc())
             .limit(MAX_ZEILEN)
         ).all()

@@ -120,6 +120,13 @@
           <dd class="col-7">{{ umgebung }}</dd>
           <dt class="col-5 text-muted">Datenbank</dt>
           <dd class="col-7">Schema {{ db_revision or "unbekannt" }}</dd>
+          <dt class="col-5 text-muted">Mailversand</dt>
+          <dd class="col-7">
+            {% if mail_konfiguriert %}<span class="text-success">aktiv</span> über {{ smtp_host }}<br>
+            <span class="text-muted">Absender {{ mail_absender }}</span>
+            {% else %}<span class="text-muted">nicht konfiguriert</span><br>
+            <span class="text-muted">WERKPLUS_SMTP_* in der .env setzen</span>{% endif %}
+          </dd>
         </dl>
         <p class="text-muted small mb-0 mt-3">
           Stimmt der Stand nach einem Update nicht, wurde der Container nicht neu

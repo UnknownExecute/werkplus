@@ -5,7 +5,7 @@
           hx-post="/belege/detail/{{ beleg.id }}/positionen"
           hx-vals='{"artikel_id": {{ artikel.id }}}'
           hx-target="#positionsbereich" hx-swap="outerHTML"
-          hx-on::after-request="document.getElementById('artikel-treffer').innerHTML = ''">
+          data-leeren-nach-request="#artikel-treffer">
     <span>{{ artikel.artikelnr }} — {{ artikel.bezeichnung }}</span>
     <span class="text-muted">{{ artikel.vk_preis | euro }} € / {{ artikel.einheit }}</span>
   </button>

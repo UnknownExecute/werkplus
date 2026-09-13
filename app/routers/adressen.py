@@ -308,6 +308,7 @@ def _kennzahlen(session: Session, adresse: Adresse) -> dict:
                 Beleg.adresse_id == adresse.id,
                 Beleg.belegart == Belegart.ANGEBOT,
                 col(Beleg.status).in_((BelegStatus.ENTWURF, BelegStatus.GEDRUCKT)),
+                col(Beleg.ist_muster).is_(False),
             )
         ).all()
     )
@@ -355,7 +356,9 @@ def _aktivitaeten_kontext(session: Session, adresse_id: int) -> dict:
 def _detail_kontext(session: Session, adresse: Adresse) -> dict:
     belege = list(
         session.exec(
-            select(Beleg).where(Beleg.adresse_id == adresse.id).order_by(col(Beleg.datum).desc())
+            select(Beleg)
+            .where(Beleg.adresse_id == adresse.id, col(Beleg.ist_muster).is_(False))
+            .order_by(col(Beleg.datum).desc())
         ).all()
     )
     anlagen = list(

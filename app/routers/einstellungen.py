@@ -18,7 +18,7 @@ from app.database import get_session
 from app.dependencies import require_admin
 from app.models import Belegart, Benutzer
 from app.routers.belege import BELEGART_LABELS
-from app.services import adresse_service, firma_service, nummernkreis_service
+from app.services import adresse_service, firma_service, mail_service, nummernkreis_service
 from app.services.fehler import WerkplusFehler
 from app.templating import templates
 
@@ -86,6 +86,11 @@ def einstellungen_form(  # noqa: PLR0913
             "nk_fehler": nk_fehler,
             "umgebung": settings.env,
             "db_revision": _db_revision(session),
+            "mail_konfiguriert": mail_service.ist_konfiguriert(),
+            "smtp_host": settings.smtp_host,
+            "mail_absender": (
+                mail_service.absender(session) if mail_service.ist_konfiguriert() else ""
+            ),
             **_nummernkreis_kontext(session, date.today().year),
         },
     )

@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# htmx darf kein eval nutzen (CSP ohne unsafe-eval); hx-on ist deshalb tabu — siehe werkplus.js #}
+  <meta name="htmx-config" content='{"allowEval": false}'>
   <meta name="csrf-token" content="{{ csrf_token(request) }}">
   <title>{% block title %}WerkPlus{% endblock %} – WerkPlus</title>
   {# ?v=… wechselt bei jedem Ausrollen (app/version.py). Ohne diesen Cache-Buster

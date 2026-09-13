@@ -103,7 +103,7 @@
     <form class="card mb-4"
           hx-post="/adressen/{{ adresse.id }}/aktivitaeten"
           hx-target="#aktivitaeten-liste" hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) this.reset()">
+          data-reset-nach-request>
       <div class="card-body row g-2 align-items-end">
         <div class="col-md-2">
           <label class="form-label">Art</label>

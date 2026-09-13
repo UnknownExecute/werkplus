@@ -1,0 +1,22 @@
+{# Kplus „Belegadresse tauschen" (nur Entwurf). Erwartet: beleg, adressen #}
+<div class="card mt-2 mb-3 adresse-dialog">
+  <div class="card-body py-3">
+    <h6 class="card-title">Belegadresse tauschen</h6>
+    <form method="post" action="/belege/detail/{{ beleg.id }}/adresse" class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label class="form-label" for="tausch-adresse">Neue Adresse</label>
+        <select class="form-select form-select-sm" id="tausch-adresse" name="adresse_id" autofocus>
+          {% for a in adressen %}
+          <option value="{{ a.id }}" {% if a.id == beleg.adresse_id %}selected{% endif %}>{{ a.adressnr }} {{ a.firma }}{% if a.ort %} – {{ a.ort }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button class="btn btn-sm btn-primary" type="submit">Tauschen</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                onclick="this.closest('.adresse-dialog').remove()">Abbrechen</button>
+      </div>
+      <div class="col-12 form-text">Positionen bleiben erhalten; Lieferadresse wird zurückgesetzt, Zahlungsziel kommt von der neuen Adresse.</div>
+    </form>
+  </div>
+</div>

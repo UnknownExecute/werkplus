@@ -41,6 +41,14 @@ class Settings:
     # CSRF-Schutz für schreibende Requests. Standard: an. Die Testsuite schaltet
     # ihn global ab (und deckt ihn gezielt in tests/test_csrf.py ab).
     csrf_aktiv: bool = os.environ.get("WERKPLUS_CSRF", "1") != "0"
+    # Mailversand von Belegen (PDF-Anhang) per SMTP. Leer = Mailversand aus.
+    # smtp_sicherheit: "starttls" (Port 587, Standard), "ssl" (465) oder "keine".
+    smtp_host: str = os.environ.get("WERKPLUS_SMTP_HOST", "")
+    smtp_port: int = int(os.environ.get("WERKPLUS_SMTP_PORT", "587"))
+    smtp_benutzer: str = os.environ.get("WERKPLUS_SMTP_BENUTZER", "")
+    smtp_passwort: str = os.environ.get("WERKPLUS_SMTP_PASSWORT", "")
+    smtp_absender: str = os.environ.get("WERKPLUS_SMTP_ABSENDER", "")
+    smtp_sicherheit: str = os.environ.get("WERKPLUS_SMTP_SICHERHEIT", "starttls").lower()
     # Secure-Flag des Session-Cookies. Standard: in Produktion an (HTTPS-Pflicht).
     # WICHTIG: Bei reinem HTTP-Zugriff (z. B. direkt http://<NAS-IP>:9999 ohne
     # HTTPS-Reverse-Proxy) sendet der Browser das Cookie dann NICHT — Login

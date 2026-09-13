@@ -278,6 +278,8 @@ table.tabelle-kompakt td, table.tabelle-kompakt th { padding: 0.4rem 0.6rem; }
 .wp-status-offen { color: #b45309; background: #fef3c7; }
 .wp-status-entwurf { color: var(--wp-text-muted); background: var(--wp-surface-2); }
 .wp-status-storniert, .wp-status-verloren { color: #b91c1c; background: #fee2e2; }
+.wp-status-muster { color: #6d28d9; background: #ede9fe; }
+[data-bs-theme="dark"] .wp-status-muster { background: #4c1d95; color: #ddd6fe; }
 .wp-status-druck { color: var(--wp-text-muted); }
 .wp-status-druck:hover { color: var(--wp-primary); background: var(--wp-primary-soft); }
 [data-bs-theme="dark"] .wp-status-erledigt { background: #14532d; color: #86efac; }

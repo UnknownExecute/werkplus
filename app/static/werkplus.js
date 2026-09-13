@@ -173,6 +173,23 @@ function initThemeToggle() {
   });
 }
 
+// ---- CSP-sichere Ersatz für hx-on (die CSP verbietet eval, das hx-on braucht) ----
+// data-reset-nach-request         am <form>: nach erfolgreichem HTMX-Request zurücksetzen
+// data-leeren-nach-request="#id"  am Element: nach erfolgreichem Request Ziel leeren
+function initNachRequest() {
+  document.body.addEventListener("htmx:afterRequest", function (e) {
+    const el = e.detail && e.detail.elt;
+    if (!el || !e.detail.successful) return;
+    const form = el.closest ? el.closest("form[data-reset-nach-request]") : null;
+    if (form) form.reset();
+    const quelle = el.closest ? el.closest("[data-leeren-nach-request]") : null;
+    if (quelle) {
+      const ziel = document.querySelector(quelle.dataset.leerenNachRequest);
+      if (ziel) ziel.innerHTML = "";
+    }
+  });
+}
+
 // ---- Globaler Ladebalken: Body während HTMX-Requests markieren ----
 function initLadebalken() {
   document.body.addEventListener("htmx:beforeRequest", function () {
@@ -188,6 +205,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initAutoGrow();
   initThemeToggle();
   initLadebalken();
+  initNachRequest();
 });
 // Nach jedem HTMX-Swap (z. B. neu gerendertes Positionsgrid) erneut anwenden.
 document.body.addEventListener("htmx:afterSwap", initAutoGrow);

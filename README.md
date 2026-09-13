@@ -218,7 +218,7 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
 ## Fachliche Eckpunkte
 
 - Belegkette Verkauf: Angebot → Auftrag → Lieferschein → Rechnung → (Gutschrift)
-- Belegkette Einkauf: Bestellung → EK-Lieferschein (Wareneingang) → EK-Rechnung
+- Belegkette Einkauf: Preisanfrage → Bestellung → EK-Lieferschein (Wareneingang) → EK-Rechnung
 - Statusmaschine je Beleg: Entwurf → Gedruckt → Erledigt/Storniert; gedruckte
   Rechnungen sind unveränderlich (nur Storno/Gutschrift)
 - Nummernkreise je Belegart und Jahr im Kplus-Format `JJNNNN` (z. B. `260001`),
@@ -237,6 +237,11 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
   Ansprechpartner (Hauptkontakt), Lieferadressen (am Beleg wählbar, auf dem PDF),
   Aktivitäten mit Wiedervorlage/Erledigt und Belegbezug; Seite „Wiedervorlage"
   (fällig / nächste 7 Tage / alle, nur meine) plus Dashboard-Kachel
+- Belegkette abgerundet: Preisanfrage (Einkauf, PDF ohne Preise) → Bestellung;
+  Beleg-Muster (Vorlagen mit M-Nummer, nie gebucht, „Beleg aus Muster" auch für
+  andere Adresse, Filter „Muster" in der Übersicht); Belegadresse tauschen
+  (nur Entwurf); Mailversand mit PDF-Anhang per SMTP (`WERKPLUS_SMTP_*`),
+  protokolliert als E-Mail-Aktivität, bucht den Entwurf
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG

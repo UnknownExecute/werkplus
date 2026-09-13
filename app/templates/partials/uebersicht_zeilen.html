@@ -2,7 +2,9 @@
    Jede Zeile trägt data-Attribute, aus denen uebersicht.js die Aktionsleiste
    speist (welche Aktion ist für den markierten Beleg erlaubt?). #}
 {% macro status_icon(beleg) -%}
-  {%- if beleg.status == 'storniert' -%}
+  {%- if beleg.ist_muster -%}
+  <span class="wp-status wp-status-muster" title="Muster (Vorlage)"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6zM14 3v4h4M9 12h6M9 16h6"/></svg><span class="visually-hidden">Muster</span></span>
+  {%- elif beleg.status == 'storniert' -%}
   <span class="wp-status wp-status-storniert" title="Storniert"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8M16 8l-8 8"/></svg><span class="visually-hidden">Storniert</span></span>
   {%- elif beleg.angebotsergebnis == 'nicht_erhalten' -%}
   <span class="wp-status wp-status-verloren" title="Auftrag nicht erhalten"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="visually-hidden">Nicht erhalten</span></span>
@@ -42,9 +44,10 @@
         data-id="{{ beleg.id }}" data-nr="{{ beleg.belegnr }}" data-adresse-id="{{ beleg.adresse_id }}"
         data-status="{{ beleg.status }}" data-brutto="{{ beleg.summe_brutto }}"
         data-entwurf="{{ 1 if beleg.status == 'entwurf' else 0 }}"
-        data-folgebeleg="{{ 1 if beleg.status in ('gedruckt', 'erledigt') else 0 }}"
-        data-angebot-offen="{{ 1 if (beleg.belegart == 'angebot' and not beleg.angebotsergebnis and beleg.status in ('entwurf', 'gedruckt')) else 0 }}"
-        data-erledigbar="{{ 1 if beleg.status == 'gedruckt' else 0 }}">
+        data-folgebeleg="{{ 1 if (beleg.status in ('gedruckt', 'erledigt') and not beleg.ist_muster) else 0 }}"
+        data-angebot-offen="{{ 1 if (beleg.belegart == 'angebot' and not beleg.ist_muster and not beleg.angebotsergebnis and beleg.status in ('entwurf', 'gedruckt')) else 0 }}"
+        data-erledigbar="{{ 1 if beleg.status == 'gedruckt' else 0 }}"
+        data-muster="{{ 1 if beleg.ist_muster else 0 }}">
       <td data-label="Nummer"><a class="fw-semibold" href="/belege/detail/{{ beleg.id }}">{{ beleg.belegnr }}</a></td>
       <td data-label="Status" class="text-center">{{ status_icon(beleg) }}</td>
       <td data-label="Druck" class="text-center">
