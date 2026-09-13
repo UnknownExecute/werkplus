@@ -1,0 +1,34 @@
+{# Staffelpreise (HTMX-Partial in #staffeln-bereich). Erwartet: artikel, staffeln #}
+<p class="text-muted small">Ab der Staffelmenge gilt der Staffelpreis statt des Stamm-VK ({{ artikel.vk_preis | euro }} €).
+  Er wird beim Einfügen einer Position und beim Ändern der Menge automatisch gezogen, solange der Preis nicht von Hand geändert wurde.</p>
+<table class="table tabelle-kompakt align-middle" style="max-width:36rem">
+  <thead><tr><th>ab Menge</th><th class="text-end">VK netto</th><th class="text-end"></th></tr></thead>
+  <tbody>
+    <tr class="text-muted"><td>1 {{ artikel.einheit }}</td><td class="text-end">{{ artikel.vk_preis | euro }}</td><td class="text-end small">Stamm-VK</td></tr>
+    {% for s in staffeln %}
+    <tr>
+      <td>ab {{ s.ab_menge | menge }} {{ artikel.einheit }}</td>
+      <td class="text-end">{{ s.vk_preis | euro }}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/artikel/{{ artikel.id }}/staffeln/{{ s.id }}/loeschen"
+                hx-target="#staffeln-bereich" hx-swap="innerHTML">Entfernen</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form class="row g-2 align-items-end" style="max-width:36rem"
+      hx-post="/artikel/{{ artikel.id }}/staffeln" hx-target="#staffeln-bereich" hx-swap="innerHTML">
+  <div class="col-5">
+    <label class="form-label">ab Menge</label>
+    <input class="form-control form-control-sm" type="text" name="ab_menge" inputmode="decimal" required>
+  </div>
+  <div class="col-5">
+    <label class="form-label">VK netto</label>
+    <input class="form-control form-control-sm" type="text" name="vk_preis" inputmode="decimal" required>
+  </div>
+  <div class="col-2">
+    <button class="btn btn-sm btn-primary w-100" type="submit">Staffel</button>
+  </div>
+</form>

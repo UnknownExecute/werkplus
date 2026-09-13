@@ -6,7 +6,7 @@
           hx-vals='{"artikel_id": {{ artikel.id }}}'
           hx-target="#positionsbereich" hx-swap="outerHTML"
           data-leeren-nach-request="#artikel-treffer">
-    <span>{{ artikel.artikelnr }} — {{ artikel.bezeichnung }}</span>
+    <span>{{ artikel.artikelnr }}{% if artikel.matchcode %} <span class="text-muted">[{{ artikel.matchcode }}]</span>{% endif %} — {{ artikel.bezeichnung }}</span>
     <span class="text-muted">{{ artikel.vk_preis | euro }} € / {{ artikel.einheit }}</span>
   </button>
   {% endfor %}

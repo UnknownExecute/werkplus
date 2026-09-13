@@ -1,16 +1,27 @@
+{% set spalten = 10 if darf_kalkulation(request) else 9 %}
 {% for artikel in artikel_liste %}
-<tr>
-  <td><a href="/artikel/{{ artikel.id }}">{{ artikel.artikelnr }}</a></td>
-  <td>{{ artikel.bezeichnung }}</td>
-  <td>{{ artikel.warengruppe }}</td>
+{% set gesamt = bestaende.get(artikel.id, 0) %}
+{% set res = reserviert.get(artikel.id, 0) %}
+<tr{% if not artikel.aktiv %} class="text-muted"{% endif %}>
+  <td class="text-nowrap"><a href="/artikel/{{ artikel.id }}" class="fw-semibold">{{ artikel.artikelnr }}</a></td>
+  <td>{{ artikel.matchcode }}</td>
+  <td>{{ artikel.bezeichnung }}{% if artikel.ist_set %} <span class="badge text-bg-light border">Set</span>{% endif %}
+    {% if artikel.ean %}<div class="small text-muted">EAN {{ artikel.ean }}</div>{% endif %}</td>
+  <td>{{ artikel.warengruppe }}{% if artikel.unterwarengruppe %} / {{ artikel.unterwarengruppe }}{% endif %}</td>
+  {% if darf_kalkulation(request) %}<td class="text-end">{{ artikel.ek_preis | euro }}</td>{% endif %}
   <td class="text-end">{{ artikel.vk_preis | euro }}</td>
-  <td class="text-end">
-    {% if artikel.ist_lagerartikel %}{{ bestaende.get(artikel.id, 0) | menge }}{% else %}&mdash;{% endif %}
-  </td>
+  {% if artikel.ist_lagerartikel %}
+  <td class="text-end">{{ gesamt | menge }}</td>
+  <td class="text-end{% if res %} text-warning{% endif %}">{{ res | menge }}</td>
+  <td class="text-end">{{ bestellt.get(artikel.id, 0) | menge }}</td>
+  <td class="text-end fw-semibold{% if gesamt - res < 0 %} text-danger{% endif %}">{{ (gesamt - res) | menge }}</td>
+  {% else %}
+  <td class="text-end text-muted" colspan="4">Dienstleistung</td>
+  {% endif %}
 </tr>
 {% else %}
 <tr>
-  <td colspan="5" class="text-center text-muted py-4">
+  <td colspan="{{ spalten }}" class="text-center text-muted py-4">
     {% if gefiltert %}
     Keine Artikel gefunden, die zur Suche passen.<br>
     <span class="small">Suchbegriff kürzen oder anders schreiben.</span>
@@ -23,7 +34,7 @@
 {% endfor %}
 {% if pag and pag.seiten > 1 %}
 <tr>
-  <td colspan="5" class="bg-body-tertiary">
+  <td colspan="{{ spalten }}" class="bg-body-tertiary">
     {% include "partials/pagination.html" %}
   </td>
 </tr>

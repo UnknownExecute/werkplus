@@ -242,6 +242,13 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
   andere Adresse, Filter „Muster" in der Übersicht); Belegadresse tauschen
   (nur Entwurf); Mailversand mit PDF-Anhang per SMTP (`WERKPLUS_SMTP_*`),
   protokolliert als E-Mail-Aktivität, bucht den Entwurf
+- Artikelstamm im Kplus-Stil: Matchcode, EAN, Alternativnummer/Type, Hersteller,
+  Unterwarengruppe, Bemerkung, Mindest-Preis; Suche/Filter wie „Artikel suchen"
+  (Lieferant, Artikelart, Warengruppe); Reiter Lieferanten je Artikel
+  (Lieferanten-Artikelnr, EK, Lieferzeit, Hauptlieferant — Einkaufsbelege nehmen
+  den Lieferanten-EK), Staffelpreise (greifen im Beleg nach Menge), Bestand mit
+  Gesamt/Reserviert/Bestellt/Verfügbar; „letzter EK / letzter Lieferant" aus
+  der gebuchten EK-Rechnung
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG

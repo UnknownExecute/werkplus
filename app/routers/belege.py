@@ -43,6 +43,7 @@ from app.models import (
 )
 from app.pagination import Blaetterwerk, blaettere
 from app.services import (
+    artikel_service,
     artikel_set_service,
     beleg_service,
     berechnung,
@@ -1147,6 +1148,8 @@ def beleg_artikelsuche(
             .where(Artikel.aktiv == True)  # noqa: E712
             .where(
                 Artikel.artikelnr.ilike(muster)  # type: ignore[attr-defined]
+                | Artikel.matchcode.ilike(muster)  # type: ignore[attr-defined]
+                | Artikel.ean.ilike(muster)  # type: ignore[attr-defined]
                 | Artikel.bezeichnung.ilike(muster)  # type: ignore[attr-defined]
             )
             .order_by(Artikel.artikelnr)
@@ -1231,6 +1234,7 @@ def position_bearbeiten(  # noqa: PLR0913
         return _meldung(request, str(exc), status.HTTP_409_CONFLICT)
     position.bezeichnung = bezeichnung.strip()
     position.langtext = langtext.strip()
+    alte_menge = position.menge
     position.menge = parse_menge(menge)
     position.einheit = einheit.strip() or "Stk"
     position.listenpreis = parse_betrag(listenpreis, "Listenpreis")
@@ -1261,6 +1265,24 @@ def position_bearbeiten(  # noqa: PLR0913
     else:
         # Menge/Bezeichnung/… geändert → VK unverändert übernehmen (auch Freitext)
         position.einzelpreis = parse_betrag(einzelpreis, "Verkaufspreis")
+        # Kplus-Staffelpreis: Mengenänderung zieht die passende Staffel, solange der
+        # Preis noch dem automatischen Preis der alten Menge entspricht (kein
+        # manueller Preis wird überschrieben).
+        if (
+            ausloeser == f"pd-menge-{position_id}"
+            and position.artikel_id is not None
+            and beleg.belegart in VERKAUFSARTEN
+        ):
+            artikel = session.get(Artikel, position.artikel_id)
+            if artikel is not None and position.einzelpreis == artikel_service.staffelpreis(
+                session, artikel, alte_menge
+            ):
+                position.einzelpreis = artikel_service.staffelpreis(
+                    session, artikel, position.menge
+                )
+                position.aufschlag_prozent = berechnung.aufschlag_aus_vk(
+                    position.ek_preis, position.einzelpreis
+                )
     position.rabatt_prozent = parse_prozent(rabatt_prozent, "Positionsrabatt")
     position.ust_satz = ust_satz
     session.add(position)

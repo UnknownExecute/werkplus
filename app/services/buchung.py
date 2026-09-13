@@ -284,3 +284,7 @@ def registriere_lager_hooks() -> None:
     registriere_buchungs_hook(Belegart.EK_LIEFERSCHEIN, _buche_ek_lieferschein)
     registriere_storno_hook(Belegart.LIEFERSCHEIN, _storno_lieferschein)
     registriere_storno_hook(Belegart.EK_LIEFERSCHEIN, _storno_ek_lieferschein)
+    # Kplus: gebuchte EK-Rechnung schreibt „letzter EK / letzter Lieferant" fort
+    from app.services import artikel_service  # zirkulären Import vermeiden
+
+    registriere_buchungs_hook(Belegart.EK_RECHNUNG, artikel_service.aktualisiere_letzten_ek)

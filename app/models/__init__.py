@@ -3,7 +3,13 @@
 from app.models.adresse import Adresse, AdressTyp, Ansprechpartner, Lieferadresse
 from app.models.aktivitaet import AKTIVITAET_LABELS, Aktivitaet, AktivitaetTyp
 from app.models.anlage import Anlage, Serviceeinsatz
-from app.models.artikel import UST_SAETZE, Artikel
+from app.models.artikel import (
+    ARTIKELART_LABELS,
+    UST_SAETZE,
+    Artikel,
+    ArtikelLieferant,
+    ArtikelStaffel,
+)
 from app.models.beleg import (
     AUFTRAGSART_LABELS,
     Angebotsergebnis,
@@ -33,6 +39,7 @@ from app.models.zahlung import Zahlung, Zahlungsart
 from app.models.zeiterfassung import Zeiterfassung
 
 __all__ = [
+    "ARTIKELART_LABELS",
     "AUFTRAGSART_LABELS",
     "UST_SAETZE",
     "Angebotsergebnis",
@@ -46,6 +53,8 @@ __all__ = [
     "Lieferadresse",
     "Anlage",
     "Artikel",
+    "ArtikelLieferant",
+    "ArtikelStaffel",
     "Beleg",
     "BelegPosition",
     "BelegPositionSeriennummer",

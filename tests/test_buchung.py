@@ -309,6 +309,7 @@ class TestRegistrierung:
         assert set(beleg_service._buchungs_hooks) == {
             Belegart.LIEFERSCHEIN,
             Belegart.EK_LIEFERSCHEIN,
+            Belegart.EK_RECHNUNG,  # schreibt „letzter EK / Lieferant" je Artikel fort
         }
         assert set(beleg_service._storno_hooks) == {
             Belegart.LIEFERSCHEIN,

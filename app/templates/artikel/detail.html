@@ -1,16 +1,59 @@
 {% extends "base.html" %}
 {% block title %}{{ artikel.artikelnr }} – {{ artikel.bezeichnung }}{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 mb-0">{{ artikel.artikelnr }} – {{ artikel.bezeichnung }}</h1>
-  <a class="btn btn-outline-secondary" href="/artikel">Zur Liste</a>
+{# Kplus-Artikelstamm: Kopf, Bestandskacheln, Reiter Stammdaten | Lieferanten | Staffelpreise | Bestand/SN | Set #}
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <a class="small text-decoration-none" href="/artikel">&larr; Artikel</a>
+    <h1 class="h3 mb-0">{{ artikel.artikelnr }} – {{ artikel.bezeichnung }}
+      {% if artikel.matchcode %}<span class="badge text-bg-light border">{{ artikel.matchcode }}</span>{% endif %}
+      {% if artikel.ist_set %}<span class="badge text-bg-info text-dark">Set</span>{% endif %}
+      {% if not artikel.aktiv %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
+    </h1>
+    <div class="text-muted small">
+      {% if artikel.warengruppe %}{{ artikel.warengruppe }}{% if artikel.unterwarengruppe %} / {{ artikel.unterwarengruppe }}{% endif %} &middot; {% endif %}
+      {% if artikel.hersteller %}{{ artikel.hersteller }} &middot; {% endif %}
+      {% if artikel.ean %}EAN {{ artikel.ean }} &middot; {% endif %}
+      VK {{ artikel.vk_preis | euro }} € / {{ artikel.einheit }}
+    </div>
+  </div>
 </div>
 
 {% if fehler %}<div class="alert alert-danger">{{ fehler }}</div>{% endif %}
 
-<div class="row">
-  <div class="col-lg-8">
-    <h2 class="h5">Stammdaten</h2>
+{% if artikel.ist_lagerartikel %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body wp-stat">
+    <span class="wp-stat-label">Gesamt</span><span class="wp-stat-value">{{ bestand_gesamt | menge }}</span>
+    <span class="text-muted small">{{ artikel.einheit }}</span></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body wp-stat">
+    <span class="wp-stat-label">Reserviert</span><span class="wp-stat-value">{{ reserviert | menge }}</span>
+    <span class="text-muted small">offene Aufträge</span></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body wp-stat">
+    <span class="wp-stat-label">Bestellt</span><span class="wp-stat-value">{{ bestellt | menge }}</span>
+    <span class="text-muted small">offene Bestellungen</span></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body wp-stat">
+    <span class="wp-stat-label">Verfügbar</span>
+    <span class="wp-stat-value{% if verfuegbar < 0 %} text-danger{% endif %}">{{ verfuegbar | menge }}</span>
+    <span class="text-muted small">Gesamt − Reserviert{% if artikel.mindestbestand > 0 %} · Mindest {{ artikel.mindestbestand | menge }}{% endif %}</span></div></div></div>
+</div>
+{% endif %}
+
+{% set tab = aktiver_tab | default('stammdaten') %}
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link {% if tab == 'stammdaten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-stammdaten" type="button">Stammdaten</button></li>
+  <li class="nav-item"><button class="nav-link {% if tab == 'lieferanten' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-lieferanten" type="button">Lieferanten <span class="badge rounded-pill text-bg-secondary">{{ lieferanten_eintraege | length }}</span></button></li>
+  {% if darf_kalkulation(request) %}
+  <li class="nav-item"><button class="nav-link {% if tab == 'staffeln' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-staffeln" type="button">Staffelpreise <span class="badge rounded-pill text-bg-secondary">{{ staffeln | length }}</span></button></li>
+  {% endif %}
+  <li class="nav-item"><button class="nav-link {% if tab == 'bestand' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-bestand" type="button">Bestand &amp; Seriennummern</button></li>
+  {% if artikel.ist_set %}
+  <li class="nav-item"><button class="nav-link {% if tab == 'set' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-set" type="button">Set-Komponenten</button></li>
+  {% endif %}
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade {% if tab == 'stammdaten' %}show active{% endif %}" id="tab-stammdaten">
     <form method="post" action="/artikel/{{ artikel.id }}" data-kalk-form>
       {% include "partials/artikel_formularfelder.html" %}
       <div class="mt-3">
@@ -19,50 +62,69 @@
     </form>
   </div>
 
-  <div class="col-lg-4">
-    <h2 class="h5">Lagerbestand</h2>
-    {% if artikel.ist_lagerartikel %}
-    <table class="table tabelle-kompakt">
-      <thead><tr><th>Lager</th><th class="text-end">Menge</th></tr></thead>
-      <tbody>
-        {% for bestand, lager in bestaende %}
-        <tr><td>{{ lager.name }}</td><td class="text-end">{{ bestand.menge | menge }}</td></tr>
-        {% else %}
-        <tr><td colspan="2" class="text-muted">Kein Bestand vorhanden.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted">Dienstleistung – keine Lagerführung.</p>
-    {% endif %}
-
-    <h2 class="h5 mt-4">Seriennummern</h2>
-    <table class="table tabelle-kompakt">
-      <thead><tr><th>SN</th><th>Status</th></tr></thead>
-      <tbody>
-        {% for sn in seriennummern %}
-        <tr>
-          <td>{{ sn.sn }}</td>
-          <td>
-            {% if sn.status == "auf_lager" %}<span class="badge text-bg-success">auf Lager</span>
-            {% elif sn.status == "verkauft" %}<span class="badge text-bg-secondary">verkauft</span>
-            {% else %}<span class="badge text-bg-primary">beim Kunden verbaut</span>{% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="2" class="text-muted">Keine Seriennummern vorhanden.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="tab-pane fade {% if tab == 'lieferanten' %}show active{% endif %}" id="tab-lieferanten">
+    <div id="lieferanten-bereich">
+      {% include "partials/artikel_lieferanten.html" %}
+    </div>
   </div>
-</div>
 
-{% if artikel.ist_set %}
-<div class="row mt-4">
-  <div class="col-lg-8">
-    <h2 class="h5">Set-Komponenten</h2>
-    {% include "partials/set_komponenten.html" %}
+  {% if darf_kalkulation(request) %}
+  <div class="tab-pane fade {% if tab == 'staffeln' %}show active{% endif %}" id="tab-staffeln">
+    <div id="staffeln-bereich">
+      {% include "partials/artikel_staffeln.html" %}
+    </div>
   </div>
+  {% endif %}
+
+  <div class="tab-pane fade {% if tab == 'bestand' %}show active{% endif %}" id="tab-bestand">
+    <div class="row">
+      <div class="col-lg-6">
+        <h2 class="h6 text-muted text-uppercase">Lagerbestand</h2>
+        {% if artikel.ist_lagerartikel %}
+        <table class="table tabelle-kompakt">
+          <thead><tr><th>Lager</th><th class="text-end">Menge</th></tr></thead>
+          <tbody>
+            {% for bestand, lager in bestaende %}
+            <tr><td>{{ lager.name }}</td><td class="text-end">{{ bestand.menge | menge }}</td></tr>
+            {% else %}
+            <tr><td colspan="2" class="text-muted">Kein Bestand vorhanden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <a class="btn btn-sm btn-outline-secondary" href="/lager/bewegungen?q={{ artikel.artikelnr | urlencode }}">Lagerjournal</a>
+        {% else %}
+        <p class="text-muted">Dienstleistung – keine Lagerführung.</p>
+        {% endif %}
+      </div>
+      <div class="col-lg-6">
+        <h2 class="h6 text-muted text-uppercase">Seriennummern</h2>
+        <table class="table tabelle-kompakt">
+          <thead><tr><th>SN</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for sn in seriennummern %}
+            <tr>
+              <td>{{ sn.sn }}</td>
+              <td>
+                {% if sn.status == "auf_lager" %}<span class="badge text-bg-success">auf Lager</span>
+                {% elif sn.status == "verkauft" %}<span class="badge text-bg-secondary">verkauft</span>
+                {% else %}<span class="badge text-bg-primary">beim Kunden verbaut</span>{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-muted">Keine Seriennummern vorhanden.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if artikel.ist_set %}
+  <div class="tab-pane fade {% if tab == 'set' %}show active{% endif %}" id="tab-set">
+    <div class="col-lg-8">
+      {% include "partials/set_komponenten.html" %}
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 {% endblock %}

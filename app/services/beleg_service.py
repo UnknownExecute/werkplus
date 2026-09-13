@@ -172,7 +172,7 @@ def fuege_position_hinzu(
     if artikel is None and bezeichnung is None:
         raise WerkplusFehler("Position braucht einen Artikel oder eine Freitext-Bezeichnung")
     if einzelpreis is None:
-        einzelpreis = artikel.vk_preis if artikel is not None else Decimal("0")
+        einzelpreis = vorschlagspreis(session, beleg, artikel, menge)
     if rabatt_prozent is None:
         adresse = session.get(Adresse, beleg.adresse_id)
         rabatt_prozent = (
@@ -205,6 +205,24 @@ def fuege_position_hinzu(
     session.flush()
     aktualisiere_summen(session, beleg)
     return position
+
+
+def vorschlagspreis(
+    session: Session, beleg: Beleg, artikel: Artikel | None, menge: Decimal
+) -> Decimal:
+    """Einzelpreis-Vorschlag für eine Artikelposition.
+
+    Verkaufsbelege: Staffelpreis nach Menge (sonst Stamm-VK). Einkaufsbelege
+    (Preisanfrage/Bestellung/Wareneingang/EK-Rechnung): EK beim Lieferanten des
+    Belegs, sonst Stamm-EK. Freitext: 0.
+    """
+    from app.services import artikel_service  # zirkulären Import vermeiden
+
+    if artikel is None:
+        return Decimal("0")
+    if beleg.belegart in VERKAUFSARTEN:
+        return artikel_service.staffelpreis(session, artikel, menge)
+    return artikel_service.ek_fuer_lieferant(session, artikel, beleg.adresse_id)
 
 
 def entferne_position(session: Session, beleg: Beleg, position: BelegPosition) -> None:

@@ -126,11 +126,18 @@ def _befuelle_beleg(session, beleg, artikel_sn, artikel_zwanzig, artikel_zehn) -
     Netto 20 %: 100,00 + 95,00 = 195,00 (USt 39,00)
     Netto 10 %: 90,00 (USt 9,00) — gesamt 285,00 / 48,00 / 333,00.
     """
-    pos_sn = fuege_position_hinzu(session, beleg, artikel_sn, menge=Decimal("1"))
-    fuege_position_hinzu(
-        session, beleg, artikel_zwanzig, menge=Decimal("2"), rabatt_prozent=Decimal("5")
+    # Preise explizit (VK), damit die Beträge auch auf Einkaufsbelegen gleich
+    # bleiben — dort würde der Service sonst den EK des Artikels vorschlagen.
+    pos_sn = fuege_position_hinzu(
+        session, beleg, artikel_sn, menge=Decimal("1"), einzelpreis=artikel_sn.vk_preis
     )
-    fuege_position_hinzu(session, beleg, artikel_zehn, menge=Decimal("3"))
+    fuege_position_hinzu(
+        session, beleg, artikel_zwanzig, menge=Decimal("2"), rabatt_prozent=Decimal("5"),
+        einzelpreis=artikel_zwanzig.vk_preis,
+    )
+    fuege_position_hinzu(
+        session, beleg, artikel_zehn, menge=Decimal("3"), einzelpreis=artikel_zehn.vk_preis
+    )
     sn = Seriennummer(artikel_id=artikel_sn.id, sn="SN-4711")
     session.add(sn)
     session.flush()

@@ -1,0 +1,79 @@
+{# Lieferanten je Artikel (HTMX-Partial in #lieferanten-bereich).
+   Erwartet: artikel, lieferanten_eintraege [(eintrag, adresse)], lieferanten (Auswahl) #}
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt align-middle">
+  <thead>
+    <tr><th style="width:2rem"></th><th>Lieferant</th><th>Lieferanten-Artikelnr</th>
+      {% if darf_kalkulation(request) %}<th class="text-end">EK-Preis</th>{% endif %}
+      <th class="text-end">Lieferzeit</th><th>Notiz</th><th class="text-end"></th></tr>
+  </thead>
+  <tbody>
+    {% for e, adresse in lieferanten_eintraege %}
+    <tr>
+      <td>
+        {% if e.ist_hauptlieferant %}<span class="badge text-bg-primary" title="Hauptlieferant">★</span>
+        {% else %}
+        <button class="btn btn-sm btn-link p-0 text-muted" type="button" title="Als Hauptlieferant setzen"
+                hx-post="/artikel/{{ artikel.id }}/lieferanten/{{ e.id }}/haupt"
+                hx-target="#lieferanten-bereich" hx-swap="innerHTML">☆</button>
+        {% endif %}
+      </td>
+      <td>{% if adresse %}<a href="/adressen/{{ adresse.id }}">{{ adresse.firma }}</a>{% else %}<span class="text-muted">gelöscht</span>{% endif %}</td>
+      <td>{{ e.lieferanten_artikelnr }}</td>
+      {% if darf_kalkulation(request) %}<td class="text-end">{{ e.ek_preis | euro }}</td>{% endif %}
+      <td class="text-end">{% if e.lieferzeit_tage %}{{ e.lieferzeit_tage }} Tage{% endif %}</td>
+      <td class="small text-muted">{{ e.notiz }}</td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-outline-danger" type="button"
+                hx-post="/artikel/{{ artikel.id }}/lieferanten/{{ e.id }}/loeschen"
+                hx-confirm="Bezugsquelle entfernen?"
+                hx-target="#lieferanten-bereich" hx-swap="innerHTML">Entfernen</button>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="text-muted">Noch keine Bezugsquelle erfasst. Beim Buchen einer EK-Rechnung wird der Lieferant automatisch eingetragen.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<form class="card" hx-post="/artikel/{{ artikel.id }}/lieferanten"
+      hx-target="#lieferanten-bereich" hx-swap="innerHTML">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-12"><h3 class="h6 mb-0">Bezugsquelle hinzufügen / ändern</h3></div>
+    <div class="col-md-4">
+      <label class="form-label">Lieferant *</label>
+      <select class="form-select form-select-sm" name="adresse_id" required>
+        <option value="">– wählen –</option>
+        {% for l in lieferanten %}<option value="{{ l.id }}">{{ l.adressnr }} {{ l.firma }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Lieferanten-Artikelnr</label>
+      <input class="form-control form-control-sm" type="text" name="lieferanten_artikelnr">
+    </div>
+    {% if darf_kalkulation(request) %}
+    <div class="col-md-2">
+      <label class="form-label">EK-Preis</label>
+      <input class="form-control form-control-sm" type="text" name="ek_preis" inputmode="decimal" value="0">
+    </div>
+    {% endif %}
+    <div class="col-md-1">
+      <label class="form-label">Tage</label>
+      <input class="form-control form-control-sm" type="number" name="lieferzeit_tage" min="0" value="0">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Notiz</label>
+      <input class="form-control form-control-sm" type="text" name="notiz">
+    </div>
+    <div class="col-md-8">
+      <label class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" name="ist_hauptlieferant" value="true">
+        <span class="form-check-label">Hauptlieferant</span>
+      </label>
+    </div>
+    <div class="col-md-4 text-md-end">
+      <button class="btn btn-sm btn-primary" type="submit">Speichern</button>
+    </div>
+  </div>
+</form>

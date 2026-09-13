@@ -1,20 +1,37 @@
-{# Gemeinsame Formularfelder für Artikel (neu + bearbeiten). Erwartet: artikel, ust_saetze #}
+{# Artikelformular im Kplus-Zuschnitt (neu + bearbeiten). Erwartet: artikel, ust_saetze #}
 <div class="row g-3">
   <div class="col-md-3">
-    <label class="form-label" for="artikelnr">Artikelnr *</label>
+    <label class="form-label" for="artikelnr">Artikelnummer *</label>
     <input class="form-control" type="text" id="artikelnr" name="artikelnr" value="{{ artikel.artikelnr }}" required>
   </div>
-  <div class="col-md-6">
+  <div class="col-md-3">
+    <label class="form-label" for="matchcode">Matchcode</label>
+    <input class="form-control" type="text" id="matchcode" name="matchcode" value="{{ artikel.matchcode }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="ean">EAN-Nummer</label>
+    <input class="form-control" type="text" id="ean" name="ean" value="{{ artikel.ean }}" inputmode="numeric">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label" for="alternativnr">Alternativ-Nummer / Type</label>
+    <input class="form-control" type="text" id="alternativnr" name="alternativnr" value="{{ artikel.alternativnr }}">
+  </div>
+  <div class="col-md-8">
     <label class="form-label" for="bezeichnung">Bezeichnung *</label>
     <input class="form-control" type="text" id="bezeichnung" name="bezeichnung" value="{{ artikel.bezeichnung }}" required>
   </div>
+  <div class="col-md-4">
+    <label class="form-label" for="hersteller">Hersteller</label>
+    <input class="form-control" type="text" id="hersteller" name="hersteller" value="{{ artikel.hersteller }}">
+  </div>
   <div class="col-md-3">
     <label class="form-label" for="warengruppe">Warengruppe</label>
-    <input class="form-control" type="text" id="warengruppe" name="warengruppe" value="{{ artikel.warengruppe }}">
+    <input class="form-control" type="text" id="warengruppe" name="warengruppe" value="{{ artikel.warengruppe }}" list="warengruppen-liste">
+    {% if warengruppen %}<datalist id="warengruppen-liste">{% for w in warengruppen %}<option value="{{ w }}">{% endfor %}</datalist>{% endif %}
   </div>
-  <div class="col-12">
-    <label class="form-label" for="langtext">Langtext</label>
-    <textarea class="form-control" id="langtext" name="langtext" rows="3">{{ artikel.langtext }}</textarea>
+  <div class="col-md-3">
+    <label class="form-label" for="unterwarengruppe">Unterwarengruppe</label>
+    <input class="form-control" type="text" id="unterwarengruppe" name="unterwarengruppe" value="{{ artikel.unterwarengruppe }}">
   </div>
   <div class="col-md-2">
     <label class="form-label" for="einheit">Einheit</label>
@@ -27,6 +44,19 @@
       <option value="{{ satz }}" {% if artikel.ust_satz == satz %}selected{% endif %}>{{ satz }} %</option>
       {% endfor %}
     </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label" for="mindestbestand">Mindestbestand</label>
+    <input class="form-control" type="text" id="mindestbestand" name="mindestbestand" inputmode="decimal"
+           value="{{ artikel.mindestbestand | menge }}">
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="langtext">Langtext (auf Belegen)</label>
+    <textarea class="form-control" id="langtext" name="langtext" rows="3">{{ artikel.langtext }}</textarea>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="bemerkung">Bemerkung (intern)</label>
+    <textarea class="form-control" id="bemerkung" name="bemerkung" rows="3">{{ artikel.bemerkung }}</textarea>
   </div>
 
   {# Kalkulation (wie Kplus): Listenpreis − Rab1 − Rab2 = EK; EK + Aufschlag % = VK.
@@ -82,6 +112,21 @@
            data-kalk="vk_brutto"
            value="{{ artikel.vk_preis | brutto(artikel.ust_satz) | menge }}">
   </div>
+  <div class="col-md-3">
+    <label class="form-label" for="mindest_vk">Mindest-Preis (VK netto)</label>
+    <input class="form-control" type="text" id="mindest_vk" name="mindest_vk" inputmode="decimal"
+           value="{{ artikel.mindest_vk | string | replace('.', ',') }}">
+  </div>
+  {% if artikel.id %}
+  <div class="col-md-9">
+    <div class="form-text pt-4">
+      Letzter EK: <strong>{{ artikel.letzter_ek | euro }}</strong>
+      {% if letzter_lieferant %} bei <a href="/adressen/{{ letzter_lieferant.id }}">{{ letzter_lieferant.firma }}</a>{% endif %}
+      {% if artikel.letzter_ek_am %} am {{ artikel.letzter_ek_am | datum }}{% endif %}
+      &middot; Letzte Preisänderung: {{ artikel.letzte_preisaenderung | datum if artikel.letzte_preisaenderung else "–" }}
+    </div>
+  </div>
+  {% endif %}
   {% else %}
   {# Kein Preisrecht: Kalkulationsfelder verborgen, Pflichtwerte als Hidden mitsenden. #}
   <input type="hidden" name="listenpreis_netto"
@@ -94,24 +139,26 @@
          value="{{ artikel.aufschlag_prozent | string | replace('.', ',') }}">
   <input type="hidden" name="vk_preis"
          value="{{ artikel.vk_preis | string | replace('.', ',') }}">
+  <input type="hidden" name="mindest_vk"
+         value="{{ artikel.mindest_vk | string | replace('.', ',') }}">
   {% endif %}
   <div class="col-12">
-    <div class="form-check">
+    <div class="form-check form-check-inline">
       <input class="form-check-input" type="checkbox" id="seriennummernpflichtig" name="seriennummernpflichtig"
              value="true" {% if artikel.seriennummernpflichtig %}checked{% endif %}>
       <label class="form-check-label" for="seriennummernpflichtig">Seriennummernpflichtig</label>
     </div>
-    <div class="form-check">
+    <div class="form-check form-check-inline">
       <input class="form-check-input" type="checkbox" id="ist_lagerartikel" name="ist_lagerartikel"
              value="true" {% if artikel.ist_lagerartikel %}checked{% endif %}>
       <label class="form-check-label" for="ist_lagerartikel">Lagerartikel (sonst Dienstleistung)</label>
     </div>
-    <div class="form-check">
+    <div class="form-check form-check-inline">
       <input class="form-check-input" type="checkbox" id="ist_set" name="ist_set"
              value="true" {% if artikel.ist_set %}checked{% endif %}>
-      <label class="form-check-label" for="ist_set">Set / Stückliste (fügt beim Einsetzen seine Komponenten ein)</label>
+      <label class="form-check-label" for="ist_set">Set / Stückliste</label>
     </div>
-    <div class="form-check">
+    <div class="form-check form-check-inline">
       <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv"
              value="true" {% if artikel.aktiv %}checked{% endif %}>
       <label class="form-check-label" for="aktiv">Aktiv</label>

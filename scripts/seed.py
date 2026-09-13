@@ -36,6 +36,7 @@ from app.models import (
 )
 from app.services import (
     adresse_service,
+    artikel_service,
     beleg_service,
     berechnung,
     seriennummer_service,
@@ -201,6 +202,7 @@ def seed_artikel(session: Session, lager: Lager) -> None:
         artikel = Artikel(
             artikelnr=nr, bezeichnung=bez, warengruppe=wg, einheit=einheit,
             ust_satz=ust, seriennummernpflichtig=sn_pflicht, ist_lagerartikel=ist_lager,
+            matchcode=bez.split()[0].upper()[:12],
             **_kalkulation(Decimal(ek), Decimal(vk)),
         )
         session.add(artikel)
@@ -236,6 +238,26 @@ DEMO_ANLAGEN = [
     ("Bäckerei Brotherz e.U.", "HZ-1002", "HZ-1002-DEMO01", 14, "Heizraum Keller"),
     ("Gasthof Post KG", "KT-2001", "KT-2001-DEMO01", -10, "Gastraum EG"),
 ]
+
+
+def seed_bezugsquellen(session: Session) -> None:
+    """Demo: Vaillant liefert die Thermen (Bezugsquelle), Kupferrohr hat Staffelpreise."""
+    vaillant = _hole_kunde(session, "Vaillant Austria GmbH")
+    bezugsquellen = (("HZ-1001", "0010021873", "1450.00"), ("HZ-1002", "0010023456", "5200.00"))
+    for nr, lief_nr, ek in bezugsquellen:
+        artikel = _hole_artikel(session, nr)
+        if artikel_service.lieferant_eintrag(session, artikel.id, vaillant.id) is None:
+            artikel_service.setze_lieferant(
+                session, artikel, vaillant.id, lieferanten_artikelnr=lief_nr,
+                ek_preis=Decimal(ek), lieferzeit_tage=5, ist_hauptlieferant=True,
+            )
+    rohr = _hole_artikel(session, "RO-4001")
+    if not artikel_service.staffeln(session, rohr.id):
+        artikel_service.setze_staffel(session, rohr, Decimal("50"), Decimal("10.50"))
+        artikel_service.setze_staffel(session, rohr, Decimal("100"), Decimal("9.80"))
+    rohr.ean = "9001234567890"
+    session.add(rohr)
+    session.flush()
 
 
 def _hole_kunde(session: Session, firma: str) -> Adresse:
@@ -457,6 +479,7 @@ def run(session: Session) -> None:
     lager = seed_lager(session)
     seed_adressen(session)
     seed_artikel(session, lager)
+    seed_bezugsquellen(session)
     seed_textbausteine(session)
     seed_set_artikel(session)
     session.commit()

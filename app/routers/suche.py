@@ -40,6 +40,8 @@ def _suche_artikel(session: Session, muster: str) -> list[Artikel]:
         select(Artikel)
         .where(
             Artikel.artikelnr.ilike(muster)  # type: ignore[attr-defined]
+            | Artikel.matchcode.ilike(muster)  # type: ignore[attr-defined]
+            | Artikel.ean.ilike(muster)  # type: ignore[attr-defined]
             | Artikel.bezeichnung.ilike(muster)  # type: ignore[attr-defined]
             | Artikel.warengruppe.ilike(muster)  # type: ignore[attr-defined]
         )

@@ -6,27 +6,67 @@
   <a class="btn btn-primary" href="/artikel/neu">Neuer Artikel</a>
 </div>
 
-<div class="row mb-3">
-  <div class="col-md-5">
-    <input class="form-control" type="search" name="q" value="{{ q }}"
-           placeholder="Suche: Artikelnr, Bezeichnung, Warengruppe …"
+{# Kplus „Artikel suchen": Suchbegriff über Nummer/Matchcode/EAN/Alternativnummer/
+   Bezeichnung + Filter Lieferant, Artikelart, Warengruppe #}
+<form class="card wp-ueb-filter mb-3" onsubmit="return false;"
+      hx-get="/artikel/suche" hx-trigger="change" hx-target="#artikel-tabelle" hx-swap="innerHTML">
+  <div class="wp-ueb-filter-feld wp-ueb-filter-suche">
+    <label class="form-label" for="art-q">Suchbegriff</label>
+    <input class="form-control form-control-sm" type="search" id="art-q" name="q" value="{{ q }}"
+           placeholder="Artikelnummer, Matchcode, EAN, Alternativnummer, Bezeichnung …"
            hx-get="/artikel/suche" hx-trigger="input changed delay:300ms"
-           hx-target="#artikel-tabelle" autofocus>
+           hx-target="#artikel-tabelle" hx-include="closest form" autofocus>
   </div>
-</div>
+  <div class="wp-ueb-filter-feld">
+    <label class="form-label" for="art-lieferant">Lieferant</label>
+    <select class="form-select form-select-sm" id="art-lieferant" name="lieferant_id">
+      <option value="">Alle</option>
+      {% for l in lieferanten %}
+      <option value="{{ l.id }}" {% if lieferant_id == l.id|string %}selected{% endif %}>{{ l.firma }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="wp-ueb-filter-feld">
+    <label class="form-label" for="art-art">Artikelart</label>
+    <select class="form-select form-select-sm" id="art-art" name="artikelart">
+      <option value="">Alle</option>
+      {% for wert, text in artikelart_labels.items() %}
+      <option value="{{ wert }}" {% if artikelart == wert %}selected{% endif %}>{{ text }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="wp-ueb-filter-feld">
+    <label class="form-label" for="art-wg">Warengruppe</label>
+    <select class="form-select form-select-sm" id="art-wg" name="warengruppe">
+      <option value="">Alle</option>
+      {% for w in warengruppen %}
+      <option value="{{ w }}" {% if warengruppe == w %}selected{% endif %}>{{ w }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
 
-<table class="table table-hover tabelle-kompakt">
+<div class="card wp-ueb-card">
+<div class="table-responsive">
+<table class="table table-hover tabelle-kompakt mb-0">
   <thead>
     <tr>
       <th>Artikelnr</th>
+      <th>Matchcode</th>
       <th>Bezeichnung</th>
       <th>Warengruppe</th>
-      <th class="text-end">VK-Preis</th>
+      {% if darf_kalkulation(request) %}<th class="text-end">EK</th>{% endif %}
+      <th class="text-end">VK</th>
       <th class="text-end">Bestand</th>
+      <th class="text-end">Reserv.</th>
+      <th class="text-end">Bestellt</th>
+      <th class="text-end">Verfügbar</th>
     </tr>
   </thead>
   <tbody id="artikel-tabelle">
     {% include "partials/artikel_zeilen.html" %}
   </tbody>
 </table>
+</div>
+</div>
 {% endblock %}
