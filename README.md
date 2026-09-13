@@ -258,6 +258,12 @@ erreichbar, kann der Header gefälscht und das IP-Limit umgangen werden.
   Wartungsvertrag (Nummer, Laufzeit, Pauschale), Belege; Anlagensuche mit
   Filtern; „Auftrag/Angebot aus Anlage" mit Anlagenbezug am Beleg; Anlagenblatt
   als Druckansicht
+- Kplus-Desktop: Kalender (`/kalender`) mit Wiedervorlagen, Belegterminen und
+  fälligen Wartungen, Monatsminiatur samt Schnellzugriff und persönlichen
+  Favoriten (Stern in der Kopfzeile) auf dem Dashboard; Tastaturbedienung:
+  `/` Suche, `?` Hilfe, `g`+Taste Navigation, `n`+Taste neuer Beleg, Pfeile/Enter
+  in Listen, Enter im Positionseditor springt zum nächsten Feld, Pfeile in der
+  Artikelsuche, Esc schließt Dialoge
 - Lieferschein bucht Lager ab und setzt Seriennummern-Status; Wareneingang bucht zu
   und legt Seriennummern an; jede Buchung im Lagerbewegungs-Journal
 - Nur Regelbesteuerung (AT): 20 % / 10 % / 13 %, Rechnung nach § 11 UStG

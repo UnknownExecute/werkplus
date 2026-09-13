@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Kalender{% endblock %}
+{% block content %}
+{# Kplus-Desktop-Kalender: Monat mit Wiedervorlagen, Belegterminen und Wartungen #}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0">Kalender</h1>
+  <div class="d-flex align-items-center gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/kalender?monat={{ monat_zurueck }}" aria-label="Voriger Monat">&lsaquo;</a>
+    <strong class="px-2">{{ monatsname }} {{ jahr }}</strong>
+    <a class="btn btn-sm btn-outline-secondary" href="/kalender?monat={{ monat_weiter }}" aria-label="Nächster Monat">&rsaquo;</a>
+    <a class="btn btn-sm btn-outline-primary ms-2" href="/kalender">Heute</a>
+  </div>
+</div>
+
+<div class="d-flex gap-3 small text-muted mb-2">
+  <span><span class="wp-kal-punkt wp-kal-wiedervorlage"></span> Wiedervorlage</span>
+  <span><span class="wp-kal-punkt wp-kal-termin"></span> Belegtermin</span>
+  <span><span class="wp-kal-punkt wp-kal-wartung"></span> Wartung</span>
+</div>
+
+<div class="card wp-ueb-card mb-4">
+<div class="table-responsive">
+<table class="table wp-kalender mb-0">
+  <thead>
+    <tr>{% for tag in ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So") %}<th>{{ tag }}</th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    {% for woche in raster %}
+    <tr>
+      {% for tag in woche %}
+      {% set liste = je_tag.get(tag, []) %}
+      <td class="{% if tag.month != monat %}wp-kal-fremd{% endif %}{% if tag == heute %} wp-kal-heute{% endif %}" id="tag-{{ tag.isoformat() }}">
+        <div class="wp-kal-tag">{{ tag.day }}</div>
+        {% for e in liste[:4] %}
+        <a class="wp-kal-eintrag wp-kal-{{ e.art }}{% if tag < heute %} wp-kal-ueberfaellig{% endif %}" href="{{ e.url }}"
+           title="{{ e.art_label }}: {{ e.titel }}{% if e.kunde %} – {{ e.kunde }}{% endif %}">{{ e.titel }}</a>
+        {% endfor %}
+        {% if liste | length > 4 %}<div class="small text-muted">+{{ liste | length - 4 }} weitere</div>{% endif %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+
+<h2 class="h5">Einträge im {{ monatsname }}</h2>
+<div class="card">
+<table class="table table-hover tabelle-kompakt mb-0 tabelle-navigierbar">
+  <thead><tr><th>Datum</th><th>Art</th><th>Betreff</th><th>Kunde</th></tr></thead>
+  <tbody>
+    {% for e in eintraege if e.datum.month == monat %}
+    <tr class="{% if e.datum < heute %}table-danger{% elif e.datum == heute %}table-warning{% endif %}">
+      <td class="text-nowrap">{{ e.datum | datum }}</td>
+      <td><span class="wp-kal-punkt wp-kal-{{ e.art }}"></span> {{ e.art_label }}</td>
+      <td><a href="{{ e.url }}">{{ e.titel }}</a></td>
+      <td>{{ e.kunde }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-muted">Keine Einträge in diesem Monat.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

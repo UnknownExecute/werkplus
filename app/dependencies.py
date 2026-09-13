@@ -23,6 +23,11 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             headers={"Location": "/login"},
         )
+    # Favoriten für die Seitenleiste (base.html) — über dieselbe Session wie der
+    # Request, damit Tests mit ihrer Engine und Produktion gleich funktionieren.
+    from app.services import favoriten_service  # zirkulären Import vermeiden
+
+    request.state.favoriten = favoriten_service.fuer_benutzer(session, benutzer.id)
     return benutzer
 
 

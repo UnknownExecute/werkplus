@@ -22,6 +22,7 @@ from app.models.beleg import (
 )
 from app.models.benutzer import Benutzer, Rolle
 from app.models.bugreport import BugReport, MeldungTyp
+from app.models.favorit import Favorit
 from app.models.firma import Firma
 from app.models.lager import Buchungsart, Lager, Lagerbestand, Lagerbewegung
 from app.models.nummernkreis import Nummernkreis
@@ -66,6 +67,7 @@ __all__ = [
     "BugReport",
     "Buchungsart",
     "MeldungTyp",
+    "Favorit",
     "Firma",
     "Lager",
     "Lagerbestand",

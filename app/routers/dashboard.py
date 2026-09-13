@@ -22,7 +22,8 @@ from app.models import (
     Benutzer,
 )
 from app.routers.belege import BELEGART_LABELS, STATUS_BADGES, STATUS_LABELS, _bereich_fuer
-from app.services import adresse_service
+from app.routers.desktop import kalender_kontext
+from app.services import adresse_service, favoriten_service
 from app.services.berechtigung import darf_bereich
 from app.templating import templates
 
@@ -134,10 +135,13 @@ def dashboard(
         for beleg, adresse in _letzte_belege(session)
         if darf_bereich(request, _bereich_fuer(beleg.belegart))
     ]
+    heute = date.today()
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
+            "kalender": kalender_kontext(request, session, heute.year, heute.month),
+            "favoriten": favoriten_service.fuer_benutzer(session, benutzer.id),
             "benutzer": benutzer,
             "angebote": angebote,
             "angebote_anzahl": angebote_anzahl,

@@ -52,6 +52,17 @@ templates.env.filters["brutto"] = brutto_wert
 from app.services import berechtigung  # noqa: E402
 
 templates.env.globals["darf_bereich"] = berechtigung.darf_bereich
+
+
+def lade_favoriten(request) -> list:
+    """Favoriten des angemeldeten Benutzers für die Seitenleiste.
+
+    Werden von ``get_current_user`` in ``request.state`` abgelegt; Seiten ohne
+    diese Abhängigkeit (Login, 403) zeigen keine Favoriten."""
+    return list(getattr(request.state, "favoriten", []) or [])
+
+
+templates.env.globals["lade_favoriten"] = lade_favoriten
 templates.env.globals["darf_kalkulation"] = berechtigung.darf_kalkulation
 
 # CSRF-Token für Formulare/Meta-Tag (siehe app.security + werkplus.js).

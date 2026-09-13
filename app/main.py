@@ -22,6 +22,7 @@ from app.routers import (
     benutzer,
     bugreport,
     dashboard,
+    desktop,
     einstellungen,
     lager,
     suche,
@@ -59,6 +60,7 @@ app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(desktop.router)
 app.include_router(adressen.router)
 app.include_router(artikel.router)
 app.include_router(aktivitaeten.router)
